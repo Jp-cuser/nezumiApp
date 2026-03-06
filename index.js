@@ -119,23 +119,21 @@ const client = new Client({
 
 // 1. ログイン確認用のコードを追加（client.onの上に入れる）
 client.once('clientReady', async (c) => {
-    console.log(`${c.user.tag} がログインしました！🔮`);
+    console.log(`${c.user.tag} (ねずみタロット) がログインしました！🔮`);
 
-    // スラッシュコマンドの定義
     const data = [
-        {
-            name: 'tarot',
-            description: 'タロットカードを1枚引きます',
-        },
-        {
-            name: 'tarot3',
-            description: '3枚のカードで過去・現在・未来を占います',
-        },
+        { name: 'tarot', description: 'タロットカードを1枚引きます' },
+        { name: 'tarot3', description: '3枚のカードで過去・現在・未来を占います' },
     ];
 
-    // サーバーにコマンドを登録（全サーバーに反映されるまで数分かかる場合があります）
-    await client.application.commands.set(data);
-    console.log('スラッシュコマンドの登録が完了しました！✅');
+    // --- 💡 特定のサーバーに即時登録する設定 ---
+    const guildId = '1450709451488100396'; 
+    const guild = client.guilds.cache.get(guildId);
+
+    if (guild) {
+        await guild.commands.set(data);
+        console.log(`サーバー [${guild.name}] にコマンドを即時登録しました！✅`);
+    }
 });
 
 // 2. メッセージ反応部分（全角スペースを除去し、構造を整理）
