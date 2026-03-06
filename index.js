@@ -126,16 +126,22 @@ client.once('clientReady', async (c) => {
         { name: 'tarot3', description: '3枚のカードで過去・現在・未来を占います' },
     ];
 
-    // --- 💡 特定のサーバーに即時登録する設定 ---
+    // 1. 拠点となるサーバーのIDを指定（ここにコピーしたIDを貼り付け）
     const guildId = '1450709451488100396'; 
     const guild = client.guilds.cache.get(guildId);
 
     if (guild) {
+        // 2. このサーバーだけにコマンドを登録（即時反映されます！）
         await guild.commands.set(data);
-        console.log(`サーバー [${guild.name}] にコマンドを即時登録しました！✅`);
+        
+        // 3. 【重要】もし以前に登録した「グローバル（全サーバー用）」のコマンドが残っていたら消去する
+        await client.application.commands.set([]); 
+        
+        console.log(`サーバー [${guild.name}] 専用にコマンドを限定しました！✅`);
+    } else {
+        console.error('指定されたギルドが見つかりません。IDを確認してください。');
     }
 });
-
 // 2. メッセージ反応部分（全角スペースを除去し、構造を整理）
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isChatInputCommand()) return;
