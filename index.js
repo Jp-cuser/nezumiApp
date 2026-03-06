@@ -33,27 +33,28 @@ const tarotCards = [
 // --- [追加] 画像をダウンロードして、必要なら反転させる関数 ---
 async function getCardImage(imageFileName, isReversed) {
     try {
-        // 1. ローカルフォルダ内の画像パスを作成
-        // 'images' フォルダの中に画像が入っている前提です
         const imagePath = path.join(__dirname, 'images', imageFileName);
 
-        // 2. sharpにファイルのパスを直接渡す
-        let imageProcessor = sharp(imagePath);
+        let imageProcessor = sharp(imagePath)
+            // 💡 1. リサイズする（幅500pxに固定し、高さは自動調整）
+            .resize(500);
         
         if (isReversed) {
-            // 逆位置なら上下反転（flip）させる
             imageProcessor = imageProcessor.flip();
         }
 
-        // 3. 処理した画像をBufferとして出力
-        const processedImageBuffer = await imageProcessor.png().toBuffer();
+        // 💡 2. 圧縮設定（PNGのままでもいいですが、JPEGにすると劇的に軽くなります）
+        // png({ quality: 80 }) や jpeg({ quality: 80 }) を使います
+        const processedImageBuffer = await imageProcessor
+            .jpeg({ quality: 80, progressive: true }) 
+            .toBuffer();
         
-        // 4. Discord用の添付ファイルオブジェクトを作成
-        const filename = `card_${Math.floor(Math.random() * 10000)}.png`;
+        // ファイル名も .jpg に合わせておきます
+        const filename = `card_${Math.floor(Math.random() * 10000)}.jpg`;
         return new AttachmentBuilder(processedImageBuffer, { name: filename });
 
     } catch (error) {
-        console.error('ローカル画像処理エラー:', error.message);
+        console.error('画像処理エラー:', error.message);
         return null; 
     }
 }
@@ -117,7 +118,7 @@ const client = new Client({
 });
 
 // 1. ログイン確認用のコードを追加（client.onの上に入れる）
-client.once('ready', async (c) => {
+client.once('clientReady', async (c) => {
     console.log(`${c.user.tag} がログインしました！🔮`);
 
     // スラッシュコマンドの定義
@@ -170,7 +171,7 @@ client.on('interactionCreate', async (interaction) => {
     }
 
 	// --- 3枚引き (/tarot3) ---
-	if (interaction.commandName === 'tarot3') {
+	else if (interaction.commandName === 'tarot3') {
     	await interaction.deferReply();
 	
     	let deck = [...tarotCards];
