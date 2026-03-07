@@ -525,7 +525,7 @@ if (['mouse', 'rat', 'nezumi'].includes(interaction.commandName)) {
     }
 }
 else if (interaction.commandName === 'quiz') {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply();
 
     // 1. 画像をランダムに選ぶ
     const categories = ['mouse', 'rat', 'not_mouse'];
