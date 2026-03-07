@@ -101,7 +101,6 @@ function calculateScore(card, isReversed) {
 }
 //* 2. メインの診断ロジック
 function generateTarotStory(past, present, future) {
-    // 各カードのスコアを算出
     const s1 = calculateScore(past.card, past.isReversed);
     const s2 = calculateScore(present.card, present.isReversed);
     const s3 = calculateScore(future.card, future.isReversed);
@@ -110,27 +109,24 @@ function generateTarotStory(past, present, future) {
     let storyType = "";
     let message = "";
 
-    // 3. ストーリータイプの判定
+    // 3. ねずみ風ストーリー判定
     if (s1 < s2 && s2 < s3) {
-        // 右肩上がりのパターン
         if (s1 < 0) {
             storyType = "夜明け（V字回復） 🌅";
-            message = "過去は厳しい状況にありましたが、いよいよ光が差してきました。最悪の時期は脱出し、未来には素晴らしい成功が待っています。";
+            message = "過去はボロボロのチーズみたいに大変だったけど、ついに光が見えてきたよ！これからは美味しいごちそうが待ってる予感がするんだ、ちゅ！";
         } else {
             storyType = "飛躍（右肩上がり） 🚀";
-            message = "今の順調な流れは本物です。積み重ねてきた努力がさらに加速し、想像以上の高みへ到達できるでしょう。";
+            message = "今の勢いは本物だよ！まるで大きなひまわりの種を見つけた時みたいに、どんどん良くなっていくよ。自信を持って進んでね！";
         }
     } else if (s1 > s2 && s2 > s3) {
-        // 右肩下がりのパターン
         storyType = "警告（右肩下がり） ⚠️";
-        message = "運気が少しずつ陰りを見せています。今は攻めるよりも守りを固め、足元を再点検してトラブルを未然に防ぎましょう。";
+        message = "ううっ、なんだか嫌な予感がするよ……。今は無理に動かず、巣穴でじっとして体力を蓄えるのが一番。足元をよーく確認してね！";
     } else {
-        // それ以外（上下がある、または変化なし）
         storyType = "つかの間の停滞 ☕";
         if (totalScore >= 0) {
-            message = "今は次の飛躍に向けた充電期間です。焦らずエネルギーを蓄えることで、また良い波に乗ることができます。";
+            message = "今はちょっと一休み。お気に入りの場所で毛づくろいでもして、エネルギーを貯めよう。またすぐに良い波がやってくるはずだよ、ちゅ！";
         } else {
-            message = "変化の激しい時期ですが、今は耐える時。一歩ずつ着実に進むことで、道が開けていくはずです。";
+            message = "周りがバタバタしてるけど、慌てちゃダメだよ。一歩ずつ、鼻をヒクヒクさせて慎重に進めば、きっと出口が見つかるからね。";
         }
     }
 
