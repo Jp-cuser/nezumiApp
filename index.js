@@ -158,6 +158,16 @@ client.once('clientReady', async (c) => {
             required: true,
         }]
     },
+    {
+    name: 'weather',
+    description: '指定した都道府県の1週間（7日間）の天気を教えます',
+    options: [{
+        name: 'prefecture',
+        type: 3, // STRING
+        description: '都道府県名を入力（例: 和歌山, 東京）',
+        required: true,
+    }]
+    },
     ];
 
     // 1. 拠点となるサーバーのIDを指定（ここにコピーしたIDを貼り付け）
@@ -285,6 +295,55 @@ client.on('interactionCreate', async (interaction) => {
 
     await interaction.editReply({ embeds: [embed] ,ephemeral: true });
     }
+
+    //*
+    else if (interaction.commandName === 'weather') {
+    await interaction.deferReply({ ephemeral: true });
+    const pref = interaction.options.getString('prefecture');
+
+    // 主要都市の座標データ（例として一部抜粋）
+    const coords = {
+        '和歌山': { lat: 34.23, lon: 135.17 },
+        '東京': { lat: 35.69, lon: 139.69 },
+        '大阪': { lat: 34.69, lon: 135.50 },
+        // ...必要に応じて追加
+    };
+
+    const target = coords[pref.replace(/都|道|府|県/g, '')]; // 「県」などを抜いても動くように
+
+    if (!target) {
+        return interaction.editReply('その都道府県の座標データが見つかりませんでした。');
+    }
+
+    try {
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${target.lat}&longitude=${target.lon}&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=Asia%2FTokyo`;
+        const response = await axios.get(url);
+        const daily = response.data.daily;
+
+        const embed = new EmbedBuilder()
+            .setColor(0x0099FF)
+            .setTitle(`☀️ ${pref}の1週間予報`)
+            .setDescription('ねずみが空模様を調べてきました！🐭');
+
+        // 7日分のデータをループで追加
+        for (let i = 0; i < 7; i++) {
+            const date = daily.time[i];
+            const maxTemp = daily.temperature_2m_max[i];
+            const minTemp = daily.temperature_2m_min[i];
+            const code = daily.weathercode[i]; // 天気コードをアイコンに変換する関数を後で作る
+
+            embed.addFields({ 
+                name: `${date}`, 
+                value: `最高: ${maxTemp}℃ / 最低: ${minTemp}℃`, 
+                inline: true 
+            });
+        }
+
+        await interaction.editReply({ embeds: [embed]  ,ephemeral: true});
+    } catch (error) {
+        await interaction.editReply('天気情報の取得に失敗しました。',{ ephemeral: true});
+    }
+}
 
 });
 // ここに先ほどコピーした「トークン」を貼り付けます
