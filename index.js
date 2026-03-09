@@ -12,11 +12,15 @@ const sharp = require('sharp');
 const path = require('path');
 const fs = require('fs');
 require('dotenv').config();
+// index.js の冒頭
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-// トークン節約のため、軽量な Flash モデルを使用
-// もし上の行でダメなら、こちらを試してみてちゅ！
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
+
+// 💡 修正ポイント：apiVersion を "v1" に固定します
+const model = genAI.getGenerativeModel(
+    { model: "gemini-1.5-flash" }, 
+    { apiVersion: "v1" } // 👈 ここを追加！
+);
 
 
 // 💡 インテントの設定は、ここではなく「Client」を作る場所で行います
