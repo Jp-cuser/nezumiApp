@@ -502,58 +502,57 @@ client.on('interactionCreate', async (interaction) => {
 
 	// --- 3枚引き (/tarot3) ---
 	else if (interaction.commandName === 'tarot3') {
-    	// 💡 ここも ephemeral: true にする
-    	await interaction.deferReply({ ephemeral: true });
-	
-    	let deck = [...tarotCards];
-    	const positions = ['過去 🕰️', '現在 📍', '未来 🚀'];
-    	const drawnResults = []; // 診断用にデータを溜める配列
-	
-    	// tarot3 内のループ部分の修正案
-        for (let i = 0; i < 3; i++) {
-            // i（0, 1, 2）をオフセットに使うことで、3枚とも違うカードになる
-            const personalSeed = getPersonalDailyRandom(interaction.user.id, i * 100);
-    
-            // カードが重複しないように工夫（簡易的にインデックスをずらす）
-            const cardIndex = Math.floor(personalSeed * tarotCards.length);
-            const card = tarotCards[cardIndex];
-    
-            const reverseSeed = getPersonalDailyRandom(interaction.user.id, i * 500);
-            const isReversed = reverseSeed < 0.5;
+    await interaction.deferReply({ ephemeral: true });
 
+    const positions = ['過去 🕰️', '現在 📍', '未来 🚀'];
+    const drawnResults = []; 
 
-	
-        	// 診断ロジックに渡すために保存
-        	drawnResults.push({ card, isReversed });
-	
-        	const imageAttachment = await getCardImage(card.image, isReversed);
-	
-        	const embed = new EmbedBuilder()
-            	.setColor(isReversed ? 0xFF0000 : 0x00FF00)
-            	.setTitle(`${positions[i]}: ${card.name}`)
-            	.setDescription(`**${isReversed ? '逆位置 🙃' : '正位置 ✨'}**\n\n${isReversed ? card.reversed : card.upright}`);
-	
-        	if (imageAttachment) {
-            	embed.setImage(`attachment://${imageAttachment.name}`);
-            	await interaction.followUp({ embeds: [embed], files: [imageAttachment] ,ephemeral: true});
-        	} else {
-            	await interaction.followUp({ embeds: [embed], content: '画像の読み込みに失敗しました。',ephemeral: true });
-        	}
-    	}
-        const geminiExplanation = await getGeminiReading3(results, interaction.user.username);
-    	// --- 🏆 3枚引き終わった後に総合診断を表示 ---
-    	const storyResult = generateTarotStory(drawnResults[0], drawnResults[1], drawnResults[2]);
-	
-    	const storyEmbed = new EmbedBuilder()
-        	.setColor(0x5865F2) // Discordのブランドカラー（青色）
-        	.setTitle(`📖 あなたの物語: ${storyResult.storyType}`,{ name: 'ねずみの統合リーディング（Gemini 2.0）', value: geminiExplanation })
-        	.setDescription(storyResult.message)
-        	.setFooter({ text: 'タロットはあなたの可能性を示しています。' });
-	
-    	await interaction.followUp({ embeds: [storyEmbed] ,ephemeral: true});
+    // 1. 各カードの選定と個別表示
+    for (let i = 0; i < 3; i++) {
+        const personalSeed = getPersonalDailyRandom(interaction.user.id, i * 100);
+        const cardIndex = Math.floor(personalSeed * tarotCards.length);
+        const card = tarotCards[cardIndex];
 
-        
+        const reverseSeed = getPersonalDailyRandom(interaction.user.id, i * 500);
+        const isReversed = reverseSeed < 0.5;
+
+        drawnResults.push({ card, isReversed });
+
+        const imageAttachment = await getCardImage(card.image, isReversed);
+
+        const embed = new EmbedBuilder()
+            .setColor(isReversed ? 0xFF6347 : 0x00FA9A)
+            .setTitle(`${positions[i]}: ${card.name}`)
+            .setDescription(`**${isReversed ? '逆位置 🙃' : '正位置 ✨'}**\n\n${isReversed ? card.reversed : card.upright}`);
+
+        if (imageAttachment) {
+            embed.setImage(`attachment://${imageAttachment.name}`);
+            await interaction.followUp({ embeds: [embed], files: [imageAttachment], ephemeral: true });
+        } else {
+            await interaction.followUp({ embeds: [embed], content: '画像の読み込みに失敗しました。', ephemeral: true });
+        }
     }
+
+    // 💡 2. Geminiに3枚の結果を投げて、統合解説を生成させる
+    // 節約のため、drawnResultsをそのまま関数に渡します
+    const geminiExplanation = await getGeminiReading3(drawnResults, interaction.user.username);
+
+    // 3. 既存のストーリーロジック
+    const storyResult = generateTarotStory(drawnResults[0], drawnResults[1], drawnResults[2]);
+
+    // 💡 4. 最後にしろねずみ（Gemini）の統合リーディングを表示
+    const storyEmbed = new EmbedBuilder()
+        .setColor(0x5865F2)
+        .setTitle(`📖 あなたの物語: ${storyResult.storyType}`)
+        .setDescription(storyResult.message)
+        .addFields({ 
+            name: '🐭 ねずみの統合リーディング', 
+            value: geminiExplanation 
+        })
+        .setFooter({ text: `今日（${new Date().toLocaleDateString()}）の運命は決まってたんだちゅ！` });
+
+    await interaction.followUp({ embeds: [storyEmbed], ephemeral: true });
+}
 
     else if (interaction.commandName === 'hitandblow') {
     await interaction.deferReply({ ephemeral: true });
