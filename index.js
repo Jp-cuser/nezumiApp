@@ -520,6 +520,7 @@ client.once('clientReady', async (c) => {
     { name: 'nezumi', description: 'ねずみの画像……かな？' },
     { name: 'quiz', description: 'この画像はねずみかな？クイズに挑戦！' },
     { name: 'horoscope', description: '今日の星座運勢ランキングを表示するちゅ！' } ,// 💡 これを追加！
+    { name: 'rune', description: 'ルーン文字で今日の運勢を占います' },
     ];
 
     // 1. 拠点となるサーバーのIDを指定（ここにコピーしたIDを貼り付け）
