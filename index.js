@@ -411,6 +411,36 @@ async function getGeminiHoroscopeMessage(topSign, bottomSign) {
         return "みんなに良いことがありますようにだちゅ！✨";
     }
 }
+async function getGeminiFullHoroscope(rankingList) {
+    const dateStr = new Date().toLocaleDateString();
+    const cacheKey = `full-horoscope-${dateStr}`; // 1日1回だけ生成
+    
+    if (readingCache.has(cacheKey)) return readingCache.get(cacheKey);
+
+    // 💡 節約ポイント：12星座の情報を1つのテキストにまとめ、一括で依頼
+    const rankingInfo = rankingList.map((item, i) => `${i+1}位:${item.name}`).join('、');
+    
+    const prompt = `占い師「ねずみ」として、以下の星座ランキング各々に15文字以内で短い一言コメントを、最後に「今日の全体の抱負」を30文字以内で作成して。
+リスト：${rankingInfo}
+形式：
+1位：コメント
+2位：コメント
+...
+抱負：抱負の内容
+語尾は「ちゅ」で統一して。`;
+
+    try {
+        const result = await model.generateContent(prompt);
+        const text = result.response.text().trim();
+        
+        // パースしやすいようにオブジェクト化して保存（簡易実装）
+        readingCache.set(cacheKey, text);
+        return text;
+    } catch (error) {
+        console.error('Gemini Full Horoscope Error:', error);
+        return "みんなにとって素敵な一日になるちゅ！";
+    }
+}
 
 //****************************************************************************************コマンド処理・開始処理****************************************************************************************** */
 // 1. ログイン確認用のコードを追加（client.onの上に入れる）
@@ -748,38 +778,48 @@ else if (interaction.commandName === 'quiz') {
 else if (interaction.commandName === 'horoscope') {
     await interaction.deferReply({ ephemeral: true });
 
-    // 1. 各星座のスコアを計算（日付固定ロジック）
+    // 1. 各星座のスコア計算（日付固定）
     const ranking = signs.map((name, index) => {
         const score = Math.floor(getDailyRandom(index) * 100) + 1;
         const itemIdx = Math.floor(getDailyRandom(index + 100) * luckyItems.length);
         return { name, score, luckyItem: luckyItems[itemIdx] };
     });
-
     ranking.sort((a, b) => b.score - a.score);
 
-    const topSign = ranking[0].name;
-    const bottomSign = ranking[11].name;
-
-    // 💡 2. Geminiに特別なメッセージをもらう
-    const geminiMessage = await getGeminiHoroscopeMessage(topSign, bottomSign);
+    // 💡 2. Geminiに全順位のコメントと抱負を一括依頼
+    const fullMessage = await getGeminiFullHoroscope(ranking);
+    
+    // Geminiの回答から「抱負」部分を抽出
+    const lines = fullMessage.split('\n');
+    const houfu = lines.find(l => l.includes('抱負'))?.replace('抱負：', '') || "楽しく過ごそうちゅ！";
 
     const embed = new EmbedBuilder()
         .setColor(0xFFD700)
         .setTitle(`🐭 ねずみ星座占い（${new Date().toLocaleDateString()}）`)
-        .setDescription(`**ねずみの一言アドバイス：**\n「${geminiMessage}」`)
+        .setDescription(`**✨ 今日の抱負 ✨**\n「${houfu}」`)
+        .setThumbnail('https://path-to-your-white-mouse-icon.png');
 
-    // 上位3位の表示
-    ranking.slice(0, 3).forEach((item, i) => {
-        const medal = ['🥇', '🥈', '🥉'][i];
-        embed.addFields({ 
-            name: `${medal} 第${i+1}位: ${item.name}`, 
-            value: `運勢: **${item.score}点**！\nラッキーアイテム: \`${item.luckyItem}\`` 
-        });
+    // 3. 各順位を表示（上位3位は詳細、4位以下はリスト）
+    ranking.forEach((item, i) => {
+        const medal = i === 0 ? '🥇 ' : i === 1 ? '🥈 ' : i === 2 ? '🥉 ' : `第${i+1}位: `;
+        // Geminiの回答行からその順位のコメントを探す
+        const comment = lines.find(l => l.startsWith(`${i+1}位`))?.split('：')[1] || "応援してるちゅ！";
+
+        if (i < 3) {
+            // 上位3位は豪華に
+            embed.addFields({ 
+                name: `${medal}${item.name} (${item.score}点)`, 
+                value: `💬 ${comment}\n🎁 アイテム: \`${item.luckyItem}\`` 
+            });
+        } else {
+            // 4位以下は少しコンパクトに
+            embed.addFields({ 
+                name: `${medal}${item.name}`, 
+                value: `💬 ${comment}`,
+                inline: true // 横に並べてトークン（表示領域）を節約
+            });
+        }
     });
-
-    // 4位以下を簡潔に表示
-    const others = ranking.slice(3).map((item, i) => `${i+4}位: ${item.name}`).join(' | ');
-    embed.addFields({ name: '4位以下の星座', value: others });
 
     await interaction.editReply({ embeds: [embed], ephemeral: true });
 }
