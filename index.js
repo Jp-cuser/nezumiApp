@@ -541,38 +541,20 @@ if (['mouse', 'rat', 'nezumi'].includes(interaction.commandName)) {
 else if (interaction.commandName === 'quiz') {
     await interaction.deferReply({ ephemeral: true });
 
-    // 💡 1. まず、正解を「ねずみ(true)」か「それ以外(false)」で 50:50 に決める
+    // 1. 正解のカテゴリを決定 (50:50)
     const isNezumi = Math.random() < 0.5;
-    
-    let category;
-    if (isNezumi) {
-        // 💡 正解がねずみの場合：mouse か rat からランダムに選ぶ
-        category = Math.random() < 0.5 ? 'mouse' : 'rat';
-    } else {
-        // 💡 正解がねずみじゃない場合：not_mouse を選ぶ
-        category = 'not_mouse';
-    }
-
-    // 💡 2. 決まったカテゴリの中からランダムに1枚選ぶ
+    let category = isNezumi ? (Math.random() < 0.5 ? 'mouse' : 'rat') : 'not_mouse';
     const chosen = extraImages[category][Math.floor(Math.random() * extraImages[category].length)];
 
+    // 2. 画像の取得
     const attachment = await getJokeImage(chosen.file);
     if (!attachment) return interaction.editReply({ content: '画像がお散歩中で見つからないちゅ…。', ephemeral: true });
 
-    // --- 以下、ボタン作成と Embed 表示の処理 ---
-    const row = new ActionRowBuilder()
-        .addComponents(
-            new ButtonBuilder()
-                .setCustomId('correct_nezumi')
-                .setLabel('ねずみだちゅ！')
-                .setEmoji('🐭')
-                .setStyle(ButtonStyle.Success),
-            new ButtonBuilder()
-                .setCustomId('incorrect_nezumi')
-                .setLabel('ねずみじゃない！')
-                .setEmoji('❌')
-                .setStyle(ButtonStyle.Danger)
-        );
+    // 3. ボタンとEmbedの作成
+    const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('correct_nezumi').setLabel('ねずみだちゅ！').setEmoji('🐭').setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId('incorrect_nezumi').setLabel('ねずみじゃない！').setEmoji('❌').setStyle(ButtonStyle.Danger)
+    );
 
     const embed = new EmbedBuilder()
         .setColor(0xFFA500)
@@ -587,9 +569,12 @@ else if (interaction.commandName === 'quiz') {
         ephemeral: true
     });
 
-    // --- ボタン入力待ち以降の処理（変更なし） ---
+    // 💡 【重要】フィルターの定義を追加
+    // これがないと、Botは誰のクリックに反応すべきか分からず無視してしまいます。
+    const filter = i => i.user.id === interaction.user.id;
+
     try {
-        // 30秒間ボタン入力を待機
+        // 4. ボタン入力を待機
         const confirmation = await response.awaitMessageComponent({ filter, time: 30000 });
 
         const userChoice = (confirmation.customId === 'correct_nezumi');
@@ -601,24 +586,22 @@ else if (interaction.commandName === 'quiz') {
             .setDescription(`この子の正体は **${chosen.name}** でした！`)
             .setFooter({ text: isCorrect ? 'ねずみマスターだね！' : '次は当ててみてね！' });
 
-        // 💡 ポイント1: followUpではなく、この操作自体を「完了」させるためにupdateを使う
-        // これにより「不明なインタラクション」エラーを防ぎつつ結果を表示できます
+        // 結果を反映して終了
         await confirmation.update({ 
             content: isCorrect ? '🎊 おめでとう！' : '😢 どんまいだちゅ…',
             embeds: [resultEmbed], 
-            components: [], // ボタンを消す
+            components: [], 
             ephemeral: true 
         });
 
     } catch (e) {
-        // タイムアウト時の処理
+        // タイムアウトまたはエラー時の処理
         await interaction.editReply({ 
             content: '時間切れだちゅ…。また遊んでね！', 
             components: [], 
             ephemeral: true 
         });
     }
-
 }
 });
 // ここに先ほどコピーした「トークン」を貼り付けます
