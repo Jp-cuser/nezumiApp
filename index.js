@@ -18,7 +18,7 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 // 💡 修正ポイント：モデル名をフルパス "models/gemini-1.5-flash" にします
 const model = genAI.getGenerativeModel(
-    { model: "models/gemini-2.0-flash" }, // 👈 "models/" を追加
+    { model: "models/gemini-2.5-flash" }, // 👈 "models/" を追加
     { apiVersion: "v1" }
 );
 
@@ -219,7 +219,7 @@ function generateTarotStory(past, present, future) {
     }
 
     return { storyType, totalScore, message };
-}// --------------------------------------------------------
+}
 function getSingleCardComment(card, isReversed) {
     if (!isReversed) {
         // 正位置のとき
@@ -239,7 +239,7 @@ async function getGeminiReading(cardName, isReversed, username) {
     
     // プロンプトは最小限に！
     // 役割（しろねずみ）、対象（ユーザー名）、状況（カードと正逆）のみ
-    const prompt = `あなたは占い師の「ねずみ」です。${username}さんが引いたタロット「${cardName}」の${orientation}について、癒やしを与えつつ、50文字以内で短くアドバイスして。`;
+    const prompt = `あなたは占い師の「ねずみ」です。${username}さんが引いたタロット「${cardName}」の${orientation}について、癒やしを与えつつ、100文字以内で短くアドバイスして。`;
 
     try {
         // ここでGemini APIを呼び出し（モデルは軽量な Gemini 1.5 Flash がおすすめ）
@@ -272,6 +272,30 @@ async function getGeminiReading(cardName, isReversed, userId) {
     } catch (error) {
         console.error('Gemini Error:', error);
         return "占いの言葉がうまくまとまらなかったちゅ…。でも、きっと大丈夫だちゅ！";
+    }
+}
+async function getGeminiReading3(cards, username) {
+    const dateStr = new Date().toLocaleDateString();
+    // 3枚のカードIDを組み合わせてキャッシュキーを作成
+    const cacheKey = `tarot3-${dateStr}-${username}-${cards.map(c => c.name + c.isReversed).join('-')}`;
+    
+    if (readingCache.has(cacheKey)) return readingCache.get(cacheKey);
+
+    // 💡 節約ポイント：3枚の情報を1つの短いテキストにまとめる
+    const cardInfo = cards.map((c, i) => 
+        `${['過去', '現在', '未来'][i]}: ${c.name}(${c.isReversed ? '逆位置' : '正位置'})`
+    ).join('、');
+
+    const prompt = `占い師「ねずみ」として、${username}さんの3枚引き（${cardInfo}）を統合して、150文字以内で一言でアドバイスして。最後は「ちゅ」で締めて。`;
+
+    try {
+        const result = await model.generateContent(prompt);
+        const text = result.response.text().trim();
+        readingCache.set(cacheKey, text);
+        return text;
+    } catch (error) {
+        console.error('Gemini Tarot3 Error:', error);
+        return "3枚の運命が複雑すぎて、しろねずみの頭がパンクしちゃったちゅ…。でも、どのカードもあなたを応援してるちゅ！";
     }
 }
 //**********************************************************************************************ヒットアンドブロー********************************************************************************************** */
@@ -516,13 +540,13 @@ client.on('interactionCreate', async (interaction) => {
             	await interaction.followUp({ embeds: [embed], content: '画像の読み込みに失敗しました。',ephemeral: true });
         	}
     	}
-	
+        const geminiExplanation = await getGeminiReading3(results, interaction.user.username);
     	// --- 🏆 3枚引き終わった後に総合診断を表示 ---
     	const storyResult = generateTarotStory(drawnResults[0], drawnResults[1], drawnResults[2]);
 	
     	const storyEmbed = new EmbedBuilder()
         	.setColor(0x5865F2) // Discordのブランドカラー（青色）
-        	.setTitle(`📖 あなたの物語: ${storyResult.storyType}`)
+        	.setTitle(`📖 あなたの物語: ${storyResult.storyType}`,{ name: 'ねずみの統合リーディング（Gemini 2.0）', value: geminiExplanation })
         	.setDescription(storyResult.message)
         	.setFooter({ text: 'タロットはあなたの可能性を示しています。' });
 	
