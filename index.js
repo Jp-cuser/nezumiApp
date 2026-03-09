@@ -541,27 +541,37 @@ if (['mouse', 'rat', 'nezumi'].includes(interaction.commandName)) {
 else if (interaction.commandName === 'quiz') {
     await interaction.deferReply({ ephemeral: true });
 
-    const categories = ['mouse', 'rat', 'not_mouse'];
-    const category = categories[Math.floor(Math.random() * categories.length)];
+    // 💡 1. まず、正解を「ねずみ(true)」か「それ以外(false)」で 50:50 に決める
+    const isNezumi = Math.random() < 0.5;
+    
+    let category;
+    if (isNezumi) {
+        // 💡 正解がねずみの場合：mouse か rat からランダムに選ぶ
+        category = Math.random() < 0.5 ? 'mouse' : 'rat';
+    } else {
+        // 💡 正解がねずみじゃない場合：not_mouse を選ぶ
+        category = 'not_mouse';
+    }
+
+    // 💡 2. 決まったカテゴリの中からランダムに1枚選ぶ
     const chosen = extraImages[category][Math.floor(Math.random() * extraImages[category].length)];
-    const isNezumi = (category === 'mouse' || category === 'rat');
 
     const attachment = await getJokeImage(chosen.file);
-    if (!attachment) return interaction.editReply('画像がお散歩中で見つからないちゅ…。');
+    if (!attachment) return interaction.editReply({ content: '画像がお散歩中で見つからないちゅ…。', ephemeral: true });
 
-    // 💡 ボタンの作成
+    // --- 以下、ボタン作成と Embed 表示の処理 ---
     const row = new ActionRowBuilder()
         .addComponents(
             new ButtonBuilder()
                 .setCustomId('correct_nezumi')
                 .setLabel('ねずみだちゅ！')
                 .setEmoji('🐭')
-                .setStyle(ButtonStyle.Success), // 緑色
+                .setStyle(ButtonStyle.Success),
             new ButtonBuilder()
                 .setCustomId('incorrect_nezumi')
                 .setLabel('ねずみじゃない！')
                 .setEmoji('❌')
-                .setStyle(ButtonStyle.Danger) // 赤色
+                .setStyle(ButtonStyle.Danger)
         );
 
     const embed = new EmbedBuilder()
@@ -573,38 +583,11 @@ else if (interaction.commandName === 'quiz') {
     const response = await interaction.editReply({ 
         embeds: [embed], 
         files: [attachment], 
-        components: [row] ,// 💡 ボタンを設置
+        components: [row],
         ephemeral: true
     });
 
-    // 💡 ボタンの入力を待つ（30秒間）
-    const filter = i => i.user.id === interaction.user.id;
-
-    try {
-        const confirmation = await response.awaitMessageComponent({ filter, time: 30000 });
-
-        const userChoice = (confirmation.customId === 'correct_nezumi');
-        const isCorrect = (userChoice === isNezumi);
-
-        const resultEmbed = new EmbedBuilder()
-            .setColor(isCorrect ? 0x00FF00 : 0xFF0000)
-            .setTitle(isCorrect ? '✨ 正解だちゅ！' : 'あちゃ〜、残念だちゅ…')
-            .setDescription(`この子の正体は **${chosen.name}** でした！`)
-            .setFooter({ text: isCorrect ? 'ねずみマスターだね！' : '次は当ててみてね！' });
-
-        // ボタンを無効化して回答を表示
-        await confirmation.update({ 
-            embeds: [embed.setFooter({ text: 'クイズ終了！' })], 
-            components: [] ,
-            ephemeral: true
-        });
-        
-        await interaction.followUp({ embeds: [resultEmbed], ephemeral: true });
-
-    } catch (e) {
-        await interaction.editReply({ content: '時間切れだちゅ…。また遊んでね！', components: [],ephemeral: true });
-    }
-}
+    // --- ボタン入力待ち以降の処理（変更なし） ---
 
 });
 // ここに先ほどコピーした「トークン」を貼り付けます
