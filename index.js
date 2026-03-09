@@ -507,7 +507,7 @@ client.on('interactionCreate', async (interaction) => {
     const positions = ['過去 🕰️', '現在 📍', '未来 🚀'];
     const drawnResults = []; 
 
-    // 1. 各カードの選定と個別表示
+    // 1. 各カードの選定
     for (let i = 0; i < 3; i++) {
         const personalSeed = getPersonalDailyRandom(interaction.user.id, i * 100);
         const cardIndex = Math.floor(personalSeed * tarotCards.length);
@@ -516,7 +516,8 @@ client.on('interactionCreate', async (interaction) => {
         const reverseSeed = getPersonalDailyRandom(interaction.user.id, i * 500);
         const isReversed = reverseSeed < 0.5;
 
-        drawnResults.push({ card, isReversed });
+        // 💡 確実にデータを溜める
+        drawnResults.push({ name: card.name, isReversed: isReversed, card: card });
 
         const imageAttachment = await getCardImage(card.image, isReversed);
 
@@ -534,22 +535,22 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     // 💡 2. Geminiに3枚の結果を投げて、統合解説を生成させる
-    // 節約のため、drawnResultsをそのまま関数に渡します
+    // 引数名を「drawnResults」に修正しました！
     const geminiExplanation = await getGeminiReading3(drawnResults, interaction.user.username);
 
-    // 3. 既存のストーリーロジック
+    // 3. 既存のストーリーロジック（もし関数がある場合）
     const storyResult = generateTarotStory(drawnResults[0], drawnResults[1], drawnResults[2]);
 
-    // 💡 4. 最後にしろねずみ（Gemini）の統合リーディングを表示
+    // 💡 4. 最後の総評 Embed（ここが重要！）
     const storyEmbed = new EmbedBuilder()
         .setColor(0x5865F2)
         .setTitle(`📖 あなたの物語: ${storyResult.storyType}`)
         .setDescription(storyResult.message)
         .addFields({ 
-            name: '🐭 ねずみの統合リーディング', 
-            value: geminiExplanation 
+            name: '🐭 しろねずみの統合リーディング（Gemini 2.0）', 
+            value: geminiExplanation || "運命の糸が絡まってうまく読めなかったちゅ…。"
         })
-        .setFooter({ text: `今日（${new Date().toLocaleDateString()}）の運命は決まってたんだちゅ！` });
+        .setFooter({ text: `今日（${new Date().toLocaleDateString()}）の運命だちゅ！` });
 
     await interaction.followUp({ embeds: [storyEmbed], ephemeral: true });
 }
