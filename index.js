@@ -16,10 +16,10 @@ require('dotenv').config();
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// 💡 修正ポイント：apiVersion を "v1" に固定します
+// 💡 修正ポイント：モデル名をフルパス "models/gemini-1.5-flash" にします
 const model = genAI.getGenerativeModel(
-    { model: "gemini-1.5-flash" }, 
-    { apiVersion: "v1" } // 👈 ここを追加！
+    { model: "models/gemini-1.5-flash" }, // 👈 "models/" を追加
+    { apiVersion: "v1" }
 );
 
 
