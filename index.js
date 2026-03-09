@@ -547,7 +547,7 @@ client.on('interactionCreate', async (interaction) => {
         .setTitle(`📖 あなたの物語: ${storyResult.storyType}`)
         .setDescription(storyResult.message)
         .addFields({ 
-            name: '🐭 しろねずみの統合リーディング（Gemini 2.0）', 
+            name: '🐭 ねずみの統合リーディング', 
             value: geminiExplanation || "運命の糸が絡まってうまく読めなかったちゅ…。"
         })
         .setFooter({ text: `今日（${new Date().toLocaleDateString()}）の運命だちゅ！` });
