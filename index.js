@@ -493,13 +493,12 @@ async function getGeminiFullHoroscope(rankingList) {
 }
 //****************************************************************************************ルーン占い***************************************************************************************************** */
 async function getGeminiRuneReading(runeName, isReversed, username) {
-    // 💡 修正：new Date().toLocaleDateString() だとサーバー時間（朝9時に切り替わる）になる可能性があるちゅ
-    // 常に日本時間（JST）の「年月日」をキーにするように統一するちゅ！
-    const jst = getJSTInfo();
-    const dateStr = jst.dateStr; // 💡 日本時間の日付
+    // 💡 ここを追加！これがないと jst.dateStr が読めなくてエラーになるちゅ
+    const jst = getJSTInfo(); 
+    
+    const dateStr = jst.dateStr; 
     const cacheKey = `rune-${dateStr}-${username}-${runeName}-${isReversed}`;
     
-    // 以下、既存の処理...
     if (readingCache.has(cacheKey)) return readingCache.get(cacheKey);
 
     const orientation = isReversed ? "逆位置" : "正位置";
@@ -511,6 +510,8 @@ async function getGeminiRuneReading(runeName, isReversed, username) {
         readingCache.set(cacheKey, text);
         return text;
     } catch (error) {
+        // 💡 ログを出して原因を突き止めやすくするちゅ
+        console.error('Gemini Rune API Error:', error); 
         return "石に刻まれた文字が読めないちゅ…。でも運命は味方してるちゅ！";
     }
 }
