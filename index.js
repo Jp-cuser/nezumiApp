@@ -899,7 +899,7 @@ client.on('interactionCreate', async (interaction) => {
             .setColor(0xFFA500)
             .setTitle('🍣 いらっしゃい！ねずみ寿司の大将だちゅ！')
             .setDescription('ウチ自慢のネタを見てってちゅ！\n下のリストから選べば、握りたて（圧縮済み）の画像を出すちゅよ！🐭')
-            .setFooter({ text: '※画像はSharpで軽量化して送るちゅ！' });
+            .setFooter({ text: 'らっしゃいらっしゃいちゅ！' });
 
         if (daishoAttachment) {
             embed.setImage(`attachment://${daishoAttachment.name}`);
@@ -923,7 +923,7 @@ client.on('interactionCreate', async (interaction) => {
             .setColor(0x00FF00)
             .setTitle(`✨ はい、${selectedSushi.name} お待ちだちゅ！`)
             .setDescription(`${selectedSushi.description}\nお値段は **${selectedSushi.price}円** だちゅ！🐭💨`)
-            .setFooter({ text: '※前もって用意した画像を圧縮して送ったちゅ！' });
+            .setFooter({ text: 'へいおまちちゅ！' });
 
         if (sushiAttachment) {
             embed.setImage(`attachment://${sushiAttachment.name}`);
@@ -934,22 +934,23 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     // 💡 【追加】/sushi_oaiso コマンド (おあいそゲーム開始)
+    // 💡 【修正】/sushi_oaiso コマンド (おあいそゲーム開始)
     else if (interaction.commandName === 'sushi_oaiso') {
         await interaction.deferReply({ ephemeral: true });
 
         // 目標金額を設定 (例: 2000円〜5000円の間)
         const targetPrice = Math.floor(Math.random() * 4) * 1000 + 2000; 
         
-        // ゲーム状態をMapに保存 (ユーザーIDをキーにする)
+        // ゲーム状態をMapに保存
         oaisoGames.set(interaction.user.id, {
             target: targetPrice,
             currentTotal: 0,
             orderedItems: []
         });
 
-        // 寿司リストのSelectMenuを作成 (ゲーム用)
+        // 💡 修正：寿司リストのSelectMenuから値段を隠すちゅ！
         const sushiOptions = sushiMenu.map((item, index) => ({
-            label: `${item.name} - ${item.price}円`,
+            label: `${item.name}`, // item.price を消したちゅ！
             value: index.toString(),
             emoji: '🍣'
         }));
@@ -957,11 +958,10 @@ client.on('interactionCreate', async (interaction) => {
         const selectRow = new ActionRowBuilder().addComponents(
             new StringSelectMenuBuilder()
                 .setCustomId('oaiso_add_item')
-                .setPlaceholder('注文を追加するちゅ！')
+                .setPlaceholder('注文を追加するちゅ！(値段はヒミツ)')
                 .addOptions(sushiOptions)
         );
 
-        // 「おあいそ」ボタンを作成
         const buttonRow = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId('oaiso_bill_please')
@@ -972,9 +972,10 @@ client.on('interactionCreate', async (interaction) => {
         const embed = new EmbedBuilder()
             .setColor(0x5865F2)
             .setTitle('💰 おあいそゲーム！大将と勝負だちゅ！')
-            .setDescription(`目標金額は **${targetPrice}円** だちゅ！\n下のリストから寿司を追加して、ぴったりを狙ってちゅ。\n自信ができたら「おあいそ！」ボタンを押してね🐭✨`)
+            .setDescription(`目標金額は **${targetPrice}円** だちゅ！\n下のリストから寿司を追加して、ぴったりを狙ってちゅ。\n（値段は『寿司リスト』で確認しておくか、大将の顔色を読んで予想してね！）`)
             .addFields(
-                { name: '現在の合計', value: '0円', inline: true },
+                // 💡 修正：現在の合計を「？？？円」にして隠すちゅ！
+                { name: '現在の合計', value: '？？？ 円', inline: true },
                 { name: '目標金額', value: `${targetPrice}円`, inline: true }
             );
 
@@ -992,16 +993,18 @@ client.on('interactionCreate', async (interaction) => {
         const selectedIndex = parseInt(interaction.values[0], 10);
         const selectedSushi = sushiMenu[selectedIndex];
 
-        // 合計金額を更新
+        // 💡 裏側でコッソリ合計金額を更新するちゅ（ユーザーには見せない！）
         game.currentTotal += selectedSushi.price;
         game.orderedItems.push(selectedSushi.name);
 
         const embed = new EmbedBuilder()
             .setColor(0x5865F2)
-            .setTitle('💰 注文を追加したちゅ！')
-            .setDescription(`**${selectedSushi.name}** (${selectedSushi.price}円) を追加したちゅ。`)
+            .setTitle('🍣 注文を追加したちゅ！')
+            // 💡 修正：追加した時の値段表示も消すちゅ！
+            .setDescription(`へいお待ち！ **${selectedSushi.name}** を追加したちゅ。`)
             .addFields(
-                { name: '現在の合計', value: `${game.currentTotal}円`, inline: true },
+                // 💡 修正：ここでも合計金額は「？？？円」のままだちゅ！
+                { name: '現在の合計', value: `？？？ 円`, inline: true },
                 { name: '目標金額', value: `${game.target}円`, inline: true },
                 { name: '注文履歴', value: game.orderedItems.join('、') || 'なし' }
             );
