@@ -1162,6 +1162,7 @@ client.on('interactionCreate', async (interaction) => {
         await interaction.editReply({ embeds: [embed], components: [] });
     }
     // 💡 【追加】/pet_catch コマンド (相棒を捕まえる)
+    // 💡 【超進化】/pet_catch コマンド (個体値・ランダムステータス ＆ 全ステータス表示)
     else if (interaction.commandName === 'pet_catch') {
         await interaction.deferReply({ ephemeral: true });
         const userId = interaction.user.id;
@@ -1172,10 +1173,8 @@ client.on('interactionCreate', async (interaction) => {
         }
 
         // ランダムな種族を選ぶ
-        // ランダムな種族を選ぶ
         const species = petSpecies[Math.floor(Math.random() * petSpecies.length)];
         
-        // 💡 修正：今いる全ペットの「最大ランク」を調べて、その次の数字を割り当てる（被り防止！）
         let currentMaxRank = 0;
         for (const id in userPets) {
             if (userPets[id].rank > currentMaxRank) {
@@ -1184,33 +1183,40 @@ client.on('interactionCreate', async (interaction) => {
         }
         const newRank = currentMaxRank + 1;
 
-        // 💡 修正：全パラメーターを漏れなくセットするちゅ！
+        // 💡 追加：同じ種族でも「個体値（才能）」にバラつきを持たせるちゅ！（乱数で少しブレる）
+        const rMaxHp = Math.max(10, species.baseHp + Math.floor(Math.random() * 7) - 3); // -3 〜 +3 のブレ
+        const rAtk = Math.max(1, species.baseAtk + Math.floor(Math.random() * 5) - 2);   // -2 〜 +2 のブレ
+        const rDef = Math.max(0, species.baseDef + Math.floor(Math.random() * 5) - 2);   // -2 〜 +2 のブレ
+        const rSpd = Math.max(1, species.baseSpd + Math.floor(Math.random() * 5) - 2);   // -2 〜 +2 のブレ
+        const rSp = Math.max(5, species.maxSp + Math.floor(Math.random() * 5) - 2);      // -2 〜 +2 のブレ
+        const rStagger = Math.max(5, species.staggerMax + Math.floor(Math.random() * 7) - 3); // -3 〜 +3 のブレ
+
+        // ユーザー専用のペットデータを作成
         userPets[userId] = {
             name: species.name,
             emoji: species.emoji,
             level: 1,
             exp: 0,
-            hp: species.baseHp,
-            maxHp: species.baseHp,
-            atk: species.baseAtk,
-            def: species.baseDef,           // 追加
-            spd: species.baseSpd,           // 追加
-            maxSp: species.maxSp,           // 追加
-            staggerMax: species.staggerMax, // 追加
-            rank: newRank                   // 追加
+            hp: rMaxHp,
+            maxHp: rMaxHp,
+            atk: rAtk,
+            def: rDef,
+            spd: rSpd,
+            maxSp: rSp,
+            staggerMax: rStagger,
+            rank: newRank
         };
 
-        // ここが超重要！ファイルにセーブするちゅ！
         savePets();
 
         const embed = new EmbedBuilder()
             .setColor(0x00FF00)
             .setTitle(`🎉 やったー！ ${species.name} が仲間になったちゅ！`)
-            .setDescription(`${species.desc}\nこれから一緒に冒険して、最強の相棒に育てるちゅ！`)
+            .setDescription(`${species.desc}\nこれから一緒に冒険して、最強の相棒に育てるちゅ！\n*(※同じ種族でも捕まえた子によって少しだけ「才能（初期ステータス）」が違うちゅ！)*`)
             .addFields(
-                { name: 'レベル', value: 'Lv.1', inline: true },
-                { name: '体力 (HP)', value: `${species.baseHp}`, inline: true },
-                { name: '攻撃力 (ATK)', value: `${species.baseAtk}`, inline: true }
+                { name: '基本情報', value: `ランク: 第${newRank}位 | レベル: Lv.1`, inline: false },
+                // 💡 修正：すべてのステータスを表示する！
+                { name: '初期ステータス', value: `❤️ HP: ${rMaxHp} | 🗡️ ATK: ${rAtk} | 🛡️ DEF: ${rDef}\n💨 SPD: ${rSpd} | 🧠 SP上限: ${rSp} | 💫 混乱耐性: ${rStagger}`, inline: false }
             );
 
         await interaction.editReply({ embeds: [embed] });
@@ -1536,10 +1542,11 @@ client.on('interactionCreate', async (interaction) => {
     }
     // interactionCreate の中に追加
     // 💡 【追加】/pet_ranking コマンド (ランキング表示)
+    // 💡 【修正】/pet_ranking コマンド (ランキングでも全ステータス表示)
     else if (interaction.commandName === 'pet_ranking') {
         await interaction.deferReply();
 
-        // ペットのデータをランク順（数字が小さい順）に並べ替えるちゅ
+        // ペットのデータをランク順に並べ替えるちゅ
         const sortedPets = Object.entries(userPets)
             .map(([userId, pet]) => ({ userId, ...pet }))
             .sort((a, b) => a.rank - b.rank);
@@ -1556,12 +1563,12 @@ client.on('interactionCreate', async (interaction) => {
         // 上位10匹までを表示するちゅ
         sortedPets.slice(0, 10).forEach((pet, index) => {
             const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '🏅';
-            // ユーザー名をIDから取得する（キャッシュにない場合はID表示になるちゅ）
             const userName = client.users.cache.get(pet.userId)?.username || '不明なテイマー';
 
+            // 💡 修正：全ステータスを2行で綺麗に載せるちゅ！
             embed.addFields({
                 name: `${medal} 第${pet.rank}位：${pet.name} ${pet.emoji}`,
-                value: `テイマー: ${userName} | Lv.${pet.level} | HP:${pet.maxHp} / ATK:${pet.atk}`,
+                value: `テイマー: ${userName} | Lv.${pet.level}\n❤️ HP:${pet.maxHp} | 🗡️ ATK:${pet.atk} | 🛡️ DEF:${pet.def}\n💨 SPD:${pet.spd} | 🧠 SP:${pet.maxSp} | 💫 混乱:${pet.staggerMax}`,
                 inline: false
             });
         });
