@@ -883,7 +883,7 @@ else if (interaction.commandName === 'rune') {
     const noReverseRunes = ['ᛗ', 'ᚷ', 'ᚹ', 'ᚻ', 'ᚾ', 'ᛁ', 'ᛃ', 'ᛇ', 'ᛊ', 'ᛝ', 'ᛞ'];
     let isReversed = getPersonalDailyRandom(interaction.user.id, 888) < 0.5;
     if (noReverseRunes.includes(selectedRune.symbol)) isReversed = false;
-    const imagePath = path.join(__dirname, 'runes', selectedRune.image);
+    const imagePath = path.join(__dirname, 'images', selectedRune.image);
     try {
     const imageBuffer = await sharp(imagePath)
             .resize(300, 300) // 300pxに圧縮（Discordで見やすく軽量）
