@@ -5,7 +5,8 @@ const {
     AttachmentBuilder,
     ActionRowBuilder,
     ButtonBuilder,
-    ButtonStyle
+    ButtonStyle,
+    StringSelectMenuBuilder // 💡 これを忘れずに追加！
 } = require('discord.js');
 const axios = require('axios');
 const sharp = require('sharp');
