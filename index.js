@@ -747,17 +747,33 @@ client.on('interactionCreate', async (interaction) => {
 
         const fullMessage = await getGeminiFullHoroscope(ranking);
         const lines = fullMessage.split('\n');
-        const houfu = lines.find(l => l.includes('抱負'))?.replace('抱負：', '') || "楽しく過ごそうちゅ！";
+        
+        // 💡 修正1：ローカルLLMが「抱負:」と半角にしたり「**抱負**」としたりしても読み取れるようにするちゅ！
+        const houfuLine = lines.find(l => l.includes('抱負'));
+        const houfu = houfuLine ? (houfuLine.split(/[：:]/)[1] || houfuLine).replace(/\*/g, '').trim() : "楽しく過ごそうちゅ！";
 
         const embed = new EmbedBuilder()
             .setColor(0xFFD700)
             .setTitle(`🐭 ねずみ星座占い（${new Date().toLocaleDateString('ja-JP')}）`)
             .setDescription(`**✨ 今日の抱負 ✨**\n「${houfu}」`)
-            .setThumbnail('https://path-to-your-white-mouse-icon.png');
+            
 
         ranking.forEach((item, i) => {
             const medal = i === 0 ? '🥇 ' : i === 1 ? '🥈 ' : i === 2 ? '🥉 ' : `第${i+1}位: `;
-            const comment = lines.find(l => l.startsWith(`${i+1}位`))?.split('：')[1] || "応援してるちゅ！";
+            
+            // 💡 修正2：ローカルLLMの「半角コロン」や「不要な記号（*など）」を無視してコメントだけを抜き出すちゅ！
+            const targetLine = lines.find(l => l.includes(`${i+1}位`));
+            let comment = "応援してるちゅ！";
+            if (targetLine) {
+                // 「：」か「:」で分割して、後ろの文章を取り出す
+                const parts = targetLine.split(/[：:]/);
+                if (parts.length > 1) {
+                    comment = parts.slice(1).join(':').replace(/\*/g, '').trim();
+                } else {
+                    // もしコロンすら忘れていた場合は、順位の文字だけを消して採用するちゅ
+                    comment = targetLine.replace(new RegExp(`.*${i+1}位.*`), '').replace(/\*/g, '').trim();
+                }
+            }
 
             if (i < 3) {
                 embed.addFields({ name: `${medal}${item.name} (${item.score}点)`, value: `💬 ${comment}\n🎁 アイテム: \`${item.luckyItem}\`` });
