@@ -533,30 +533,33 @@ if (fs.existsSync(petDataFile)) {
 
 // 2. ランクの自動割り当て（下剋上用）
 let maxRank = 0;
+// 2. データの整合性チェックとランクの自己修復（空席詰め）
 let needsSave = false;
 
-// すでにあるペットの最大ランクを探しつつ、古いデータに新しいパラメーターを補完するちゅ
 for (const id in userPets) {
     const pet = userPets[id];
-    if (pet.rank && pet.rank > maxRank) maxRank = pet.rank;
-    
-    // 古いバージョンのペットにDEFやSPDがなければ追加する（アップデート処理）
+    // 古いバージョンのペットにDEFやSPDがなければ追加する
     if (pet.def === undefined) { pet.def = 3; needsSave = true; }
     if (pet.spd === undefined) { pet.spd = 5; needsSave = true; }
     if (pet.maxSp === undefined) { pet.maxSp = 15; needsSave = true; }
     if (pet.staggerMax === undefined) { pet.staggerMax = 20; needsSave = true; }
+    // ランクがない新規ペットには、一旦すごく大きな数字を入れておくちゅ
+    if (!pet.rank) { pet.rank = 99999; needsSave = true; } 
 }
 
-// ランクを持たないペットに新規ランクを割り当て
-for (const id in userPets) {
-    if (!userPets[id].rank) {
-        maxRank++;
-        userPets[id].rank = maxRank; 
+// 💡 修正：ランキングの空席を詰める処理！
+// 全員をランク順に並べてから、上から 1, 2, 3... と綺麗な連番を振り直すちゅ！
+const sortedIds = Object.keys(userPets).sort((a, b) => userPets[a].rank - userPets[b].rank);
+let expectedRank = 1;
+for (const id of sortedIds) {
+    if (userPets[id].rank !== expectedRank) {
+        userPets[id].rank = expectedRank;
         needsSave = true;
     }
+    expectedRank++;
 }
 
-// データを補完した場合は、すぐにセーブして整合性を確定させるちゅ！
+// データを補完・修正した場合はすぐにセーブ！
 if (needsSave) savePets();
 
 // 3. セーブ用関数
@@ -1527,8 +1530,9 @@ client.on('interactionCreate', async (interaction) => {
         await interaction.editReply({ embeds: [embed] });
     }
     // 💡 【追加】/pet_release コマンド (相棒とお別れ)
+    // 💡 【修正】/pet_release コマンド (相棒とお別れ ＆ ランキング空席詰め)
     else if (interaction.commandName === 'pet_release') {
-        await interaction.deferReply({ ephemeral: true }); // 本人にだけこっそり見せるちゅ
+        await interaction.deferReply({ ephemeral: true }); 
         const userId = interaction.user.id;
         const myPet = userPets[userId];
 
@@ -1539,15 +1543,25 @@ client.on('interactionCreate', async (interaction) => {
         const petName = myPet.name;
         const petEmoji = myPet.emoji;
         const petLevel = myPet.level;
+        
+        // 💡 追加：消す前に、今の自分のランクを覚えておくちゅ！
+        const releasedRank = myPet.rank; 
 
-        // 💡 ペットのデータを削除する魔法
+        // ペットのデータを削除
         delete userPets[userId];
 
-        // 💡 忘れずにファイルに上書きセーブ！
+        // 💡 追加：抜けた穴を詰める（自分より下の順位だった人を、全員1つ上に繰り上げるちゅ！）
+        for (const id in userPets) {
+            if (userPets[id].rank > releasedRank) {
+                userPets[id].rank -= 1;
+            }
+        }
+
+        // 忘れずにファイルに上書きセーブ！
         savePets();
 
         const embed = new EmbedBuilder()
-            .setColor(0x808080) // 少し寂しいグレー色
+            .setColor(0x808080) 
             .setTitle(`🍃 ${petEmoji} ${petName} とお別れしたちゅ…`)
             .setDescription(`Lv.${petLevel} まで一緒に過ごした ${petName} を自然に還したちゅ。\n今までありがとう、元気でね…！`)
             .setFooter({ text: '新しい相棒を探す時は、もう一度 /pet_catch を打ってちゅ！' });
