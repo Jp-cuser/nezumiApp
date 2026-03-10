@@ -906,7 +906,10 @@ else if (interaction.commandName === 'rune') {
         )
         .setFooter({ text: `${new Date().toLocaleDateString()} の石の言葉だちゅ！` });
 
-    await interaction.editReply({ embeds: [embed] });
+    await interaction.editReply({ 
+    embeds: [embed], 
+    files: [attachment] // 💡 これを忘れると画像が送信されないちゅ！
+});
     } catch (error) {
         console.error('Rune Image Error:', error);
         await interaction.editReply('画像が見つからないか、読み込みに失敗しちゃったちゅ…。');
