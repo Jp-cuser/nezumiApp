@@ -179,6 +179,7 @@ function getJSTInfo() {
         seedDate: (y * 10000) + (m * 100) + d // 乱数シード用 (20260310)
     };
 }
+
 //********************************************************************タロット*************************************************************************************************************
 // --- [追加] 画像をダウンロードして、必要なら反転させる関数 ---
 async function getCardImage(imageFileName, isReversed) {
@@ -209,11 +210,11 @@ async function getCardImage(imageFileName, isReversed) {
     }
 }
 // 💡 ユーザーIDと日付を組み合わせて、その人専用の「今日の乱数」を作る
+// 💡 修正後
 function getPersonalDailyRandom(userId, seedOffset = 0) {
-    const date = jst.seedDate;
-    const dateNum = (date.getFullYear() * 10000) + ((date.getMonth() + 1) * 100) + date.getDate();
+    const jst = getJSTInfo(); // 👈 ここを追加！
+    const dateNum = jst.seedDate; // 👈 ここも jst.seedDate に合わせる
     
-    // ユーザーID（文字列）を数値に変換して日付と混ぜる
     const userNumericId = parseInt(userId.slice(-8), 10); 
     const finalSeed = dateNum + userNumericId + seedOffset;
 
@@ -429,9 +430,10 @@ async function getJokeImage(fileName) {
     }
 }
 //*****************************************************************************************星座占い****************************************************************************************************** */
+// 💡 修正後
 function getDailyRandom(userId, seedOffset = 0) {
-    const jst = getJSTInfo();
-    const dateNum = jst.seedDate; // 💡 サーバー時間ではなく日本時間の日付
+    const jst = getJSTInfo(); // 👈 ここを追加！
+    const dateNum = jst.seedDate; 
     
     const userNumericId = parseInt(userId.slice(-8), 10); 
     const finalSeed = dateNum + userNumericId + seedOffset;
