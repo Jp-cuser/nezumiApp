@@ -533,17 +533,31 @@ if (fs.existsSync(petDataFile)) {
 
 // 2. ランクの自動割り当て（下剋上用）
 let maxRank = 0;
+let needsSave = false;
+
+// すでにあるペットの最大ランクを探しつつ、古いデータに新しいパラメーターを補完するちゅ
 for (const id in userPets) {
-    if (userPets[id].rank && userPets[id].rank > maxRank) {
-        maxRank = userPets[id].rank;
-    }
+    const pet = userPets[id];
+    if (pet.rank && pet.rank > maxRank) maxRank = pet.rank;
+    
+    // 古いバージョンのペットにDEFやSPDがなければ追加する（アップデート処理）
+    if (pet.def === undefined) { pet.def = 3; needsSave = true; }
+    if (pet.spd === undefined) { pet.spd = 5; needsSave = true; }
+    if (pet.maxSp === undefined) { pet.maxSp = 15; needsSave = true; }
+    if (pet.staggerMax === undefined) { pet.staggerMax = 20; needsSave = true; }
 }
+
+// ランクを持たないペットに新規ランクを割り当て
 for (const id in userPets) {
     if (!userPets[id].rank) {
         maxRank++;
-        userPets[id].rank = maxRank; // 1位、2位、3位...と順番に付与
+        userPets[id].rank = maxRank; 
+        needsSave = true;
     }
 }
+
+// データを補完した場合は、すぐにセーブして整合性を確定させるちゅ！
+if (needsSave) savePets();
 
 // 3. セーブ用関数
 function savePets() {
@@ -1114,9 +1128,13 @@ client.on('interactionCreate', async (interaction) => {
         }
 
         // ランダムな種族を選ぶ
+        // ランダムな種族を選ぶ
         const species = petSpecies[Math.floor(Math.random() * petSpecies.length)];
+        
+        // 💡 修正：現在の参加者数＋1 を、新しい最下位ランクとして割り当てるちゅ！
+        const newRank = Object.keys(userPets).length + 1;
 
-        // ユーザー専用のペットデータを作成
+        // 💡 修正：全パラメーターを漏れなくセットするちゅ！
         userPets[userId] = {
             name: species.name,
             emoji: species.emoji,
@@ -1124,10 +1142,15 @@ client.on('interactionCreate', async (interaction) => {
             exp: 0,
             hp: species.baseHp,
             maxHp: species.baseHp,
-            atk: species.baseAtk
+            atk: species.baseAtk,
+            def: species.baseDef,           // 追加
+            spd: species.baseSpd,           // 追加
+            maxSp: species.maxSp,           // 追加
+            staggerMax: species.staggerMax, // 追加
+            rank: newRank                   // 追加
         };
 
-        // 💡 ここが超重要！ファイルにセーブするちゅ！
+        // ここが超重要！ファイルにセーブするちゅ！
         savePets();
 
         const embed = new EmbedBuilder()
@@ -1158,14 +1181,15 @@ client.on('interactionCreate', async (interaction) => {
 
         const embed = new EmbedBuilder()
             .setColor(0x00BFFF)
-            .setTitle(`${myPet.emoji} ${interaction.user.username}の相棒：${myPet.name}`)
+            // 💡 修正：タイトルに「現在のランク」を表示！
+            .setTitle(`🏆 第${myPet.rank}位 ${myPet.emoji} ${interaction.user.username}の相棒：${myPet.name}`)
             .setDescription(`現在 **Lv.${myPet.level}** だちゅ！`)
             .addFields(
-                { name: '体力 (HP)', value: `${myPet.hp} / ${myPet.maxHp}`, inline: true },
-                { name: '攻撃力 (ATK)', value: `${myPet.atk}`, inline: true },
-                { name: '経験値 (EXP)', value: `${myPet.exp} / ${nextExp}`, inline: true }
+                // 💡 修正：DEFやSPDも表示するようにレイアウト変更！
+                { name: 'ステータス', value: `❤️ HP: ${myPet.hp} / ${myPet.maxHp}\n🗡️ ATK: ${myPet.atk} | 🛡️ DEF: ${myPet.def}\n💨 SPD: ${myPet.spd}`, inline: false },
+                { name: '経験値 (EXP)', value: `${myPet.exp} / ${nextExp}`, inline: false }
             )
-            .setFooter({ text: '※これから特訓やバトル機能を実装していくちゅ！' });
+            .setFooter({ text: '※特訓やバトルで最強を目指すちゅ！' });
 
         await interaction.editReply({ embeds: [embed] });
     }
