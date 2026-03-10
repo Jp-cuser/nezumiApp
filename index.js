@@ -578,6 +578,13 @@ function savePets() {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 const petSpecies = [
     { 
+        name: 'カワウソ', emoji: '🦦', 
+baseHp: 30, baseAtk: 3, baseDef: 3, baseSpd: 3, maxSp: 3, staggerMax: 10, 
+        desc: 'ネズミに倒される哀れな生き物だっちゅ。',
+        growth: { hp: [1, 1], atk: [1, 1], def: [1, 1], spd: [1, 1], maxSp: [1, 1], staggerMax: [1, 1] },
+        image: 'p_kawauso.jpg' // 【追加】カワウソの画像だちゅ！
+    },
+    { 
         name: 'ヒノネズミ', emoji: '🔥', 
 baseHp: 45, baseAtk: 7, baseDef: 3, baseSpd: 5, maxSp: 15, staggerMax: 20, 
         desc: '燃える闘志を持ったバランス型。攻撃と素早さが安定して育つちゅ。',
