@@ -1291,11 +1291,24 @@ client.on('interactionCreate', async (interaction) => {
                 .setFooter({ text: '※相手はオート防衛システムで応戦するちゅ！' });
         };
 
+        SP（精神力）を溜めて一気に解き放つ、一撃必殺のロマン砲だちゅね！！🐭🔥
+
+これを入れれば、「ステータスで勝てない相手の攻撃をひたすら防御で耐え忍び、SPを溜め切った瞬間に防御無視の大技でHPを消し飛ばす」という超ジャイアントキリング（大物食い）戦法が可能になるちゅ！✨
+
+相手（AI）も賢くして、SPが溜まったら高確率で必殺技を撃ってくるようにするちゅ。ヒリヒリ感がさらに倍増するはずだちゅ！
+
+index.js の /pet_battle コマンドの中にある、const getActionRow = () => { ... から collector.on('collect', ... の終わりまで を、以下のコードにまるごと上書きしてほしいちゅ！
+
+🛠️ 修正：必殺技ボタンとSP消費システムの実装
+JavaScript
+        // 💡 修正：ボタンを作る部分に「必殺技」を追加！
         const getActionRow = () => {
             return new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId('btn_atk').setLabel('🗡️ 攻撃 (マッチ)').setStyle(ButtonStyle.Danger),
+                new ButtonBuilder().setCustomId('btn_atk').setLabel('🗡️ 攻撃').setStyle(ButtonStyle.Danger),
                 new ButtonBuilder().setCustomId('btn_def').setLabel('🛡️ 防御 (混乱回復)').setStyle(ButtonStyle.Primary),
-                new ButtonBuilder().setCustomId('btn_sp').setLabel('🌀 精神集中 (SP上昇)').setStyle(ButtonStyle.Success)
+                new ButtonBuilder().setCustomId('btn_sp').setLabel('🌀 集中 (SP+5)').setStyle(ButtonStyle.Success),
+                // 💡 追加：SPが10以上ないと押せない、最高に気持ちいいボタンだちゅ！
+                new ButtonBuilder().setCustomId('btn_special').setLabel('🔥 必殺技 (SP10消費)').setStyle(ButtonStyle.Danger).setDisabled(myState.sp < 10)
             );
         };
 
@@ -1305,9 +1318,15 @@ client.on('interactionCreate', async (interaction) => {
         collector.on('collect', async i => {
             await i.deferUpdate();
             let myAction = i.customId;
-            // 相手はランダム行動（攻撃確率高め）
-            const oppActions = ['btn_atk', 'btn_atk', 'btn_def', 'btn_sp'];
-            let oppAction = oppActions[Math.floor(Math.random() * oppActions.length)];
+            
+            // 💡 相手のAIも進化！SPが10以上なら高確率で必殺技をぶっぱなしてくるちゅ！
+            let oppAction = 'btn_atk';
+            if (oppState.sp >= 10 && Math.random() < 0.7) {
+                oppAction = 'btn_special';
+            } else {
+                const oppActions = ['btn_atk', 'btn_atk', 'btn_def', 'btn_sp'];
+                oppAction = oppActions[Math.floor(Math.random() * oppActions.length)];
+            }
 
             battleLog += `\n**【ターン${turn}】**\n`;
 
@@ -1318,62 +1337,62 @@ client.on('interactionCreate', async (interaction) => {
             if (myIsStaggered) { battleLog += `⚠️ ${myPet.name} は混乱状態だ！行動できない！\n`; myAction = 'staggered'; myState.stagger = myPet.staggerMax; }
             if (oppIsStaggered) { battleLog += `⚠️ ${oppPet.name} は混乱状態だ！行動できない！\n`; oppAction = 'staggered'; oppState.stagger = oppPet.staggerMax; }
 
-            // 💡 マッチ（競り合い）処理
-            if (myAction === 'btn_atk' && oppAction === 'btn_atk') {
-                // ダイスロール（SPが高いほど有利）
-                let myRoll = myState.atk + Math.floor(Math.random() * 6) + Math.floor(myState.sp / 3);
-                let oppRoll = oppState.atk + Math.floor(Math.random() * 6) + Math.floor(oppState.sp / 3);
-                
-                battleLog += `⚔️ **マッチ発生！** [あなた: ${myRoll} VS 相手: ${oppRoll}]\n`;
-                
-                if (myRoll >= oppRoll) {
-                    let dmg = myRoll - oppState.def;
-                    if (dmg < 1) dmg = 1;
-                    if (oppIsStaggered) dmg *= 2; // 混乱時はダメージ2倍
-                    oppState.hp -= dmg;
-                    oppState.stagger -= dmg;
-                    myState.sp = Math.min(myPet.maxSp, myState.sp + 3); // マッチ勝利でSP回復
-                    oppState.sp = Math.max(-10, oppState.sp - 3);
-                    battleLog += `✨ マッチ勝利！ ${oppPet.name} に **${dmg}** のダメージ！\n`;
-                } else {
-                    let dmg = oppRoll - myState.def;
-                    if (dmg < 1) dmg = 1;
-                    if (myIsStaggered) dmg *= 2;
-                    myState.hp -= dmg;
-                    myState.stagger -= dmg;
-                    oppState.sp = Math.min(oppPet.maxSp, oppState.sp + 3);
-                    myState.sp = Math.max(-10, myState.sp - 3);
-                    battleLog += `🩸 マッチ敗北… ${myPet.name} は **${dmg}** のダメージを受けた！\n`;
-                }
-            } else {
-                // 一方的な行動の処理
-                if (myAction === 'btn_atk') {
-                    let dmg = myState.atk + Math.floor(Math.random() * 4) - (oppAction === 'btn_def' ? oppState.def * 2 : oppState.def);
-                    if (dmg < 1) dmg = 1;
-                    if (oppIsStaggered) dmg *= 2;
-                    oppState.hp -= dmg;
-                    oppState.stagger -= dmg;
-                    battleLog += `🗡️ ${myPet.name} の一方攻撃！ **${dmg}** のダメージ！\n`;
-                } else if (myAction === 'btn_def') {
-                    myState.stagger = Math.min(myPet.staggerMax, myState.stagger + 10);
-                    battleLog += `🛡️ ${myPet.name} は防御の姿勢をとり、混乱ゲージを回復した。\n`;
-                } else if (myAction === 'btn_sp') {
-                    myState.sp = Math.min(myPet.maxSp, myState.sp + 5);
-                    battleLog += `🌀 ${myPet.name} は精神を集中し、SPを高めた。\n`;
-                }
+            const doAction = (isMe, action, isEnemyDefending) => {
+                let attackerBase = isMe ? myPet : oppPet;
+                let attackerState = isMe ? myState : oppState;
+                let defenderState = isMe ? oppState : myState;
+                let isDefenderStaggered = defenderState.stagger <= 0;
 
-                if (oppAction === 'btn_atk') {
-                    let dmg = oppState.atk + Math.floor(Math.random() * 4) - (myAction === 'btn_def' ? myState.def * 2 : myState.def);
+                if (action === 'staggered') return;
+
+                if (action === 'btn_atk') {
+                    // 通常攻撃
+                    let dmg = attackerState.atk + Math.floor(attackerState.sp / 3) + Math.floor(Math.random() * 4);
+                    let actualDef = isEnemyDefending ? defenderState.def * 2 : defenderState.def;
+                    dmg -= actualDef;
+
                     if (dmg < 1) dmg = 1;
-                    if (myIsStaggered) dmg *= 2;
-                    myState.hp -= dmg;
-                    myState.stagger -= dmg;
-                    battleLog += `🗡️ ${oppPet.name} の強襲！ **${dmg}** のダメージを受けた！\n`;
-                } else if (oppAction === 'btn_def') {
-                    oppState.stagger = Math.min(oppPet.staggerMax, oppState.stagger + 10);
-                } else if (oppAction === 'btn_sp') {
-                    oppState.sp = Math.min(oppPet.maxSp, oppState.sp + 5);
+                    if (isDefenderStaggered) dmg *= 2; 
+                    
+                    defenderState.hp -= dmg;
+                    defenderState.stagger -= dmg;
+                    battleLog += `🗡️ ${attackerBase.name} の攻撃！ **${dmg}** のダメージ！\n`;
+                } else if (action === 'btn_def') {
+                    attackerState.stagger = Math.min(attackerBase.staggerMax, attackerState.stagger + 10);
+                    battleLog += `🛡️ ${attackerBase.name} は防御して、混乱ゲージを回復したちゅ。\n`;
+                } else if (action === 'btn_sp') {
+                    attackerState.sp = Math.min(attackerBase.maxSp, attackerState.sp + 5);
+                    battleLog += `🌀 ${attackerBase.name} は集中して、SPを高めたちゅ。\n`;
+                } 
+                // 💡 【追加】必殺技の処理（防御無視の超特大ダメージ！）
+                else if (action === 'btn_special') {
+                    if (attackerState.sp >= 10) {
+                        attackerState.sp -= 10;
+                        // 攻撃力の2.5倍＋乱数（相手の防御を完全に無視するロマン砲！）
+                        let dmg = Math.floor(attackerState.atk * 2.5) + Math.floor(Math.random() * 6);
+                        if (isDefenderStaggered) dmg *= 2; // 相手が混乱時に当てたらほぼ即死だちゅ！
+                        
+                        defenderState.hp -= dmg;
+                        defenderState.stagger -= dmg;
+                        battleLog += `💥 **必殺技炸裂！！** ${attackerBase.name} の限界突破の一撃！防御を貫通して **${dmg}** の大ダメージ！！\n`;
+                    } else {
+                        battleLog += `💦 ${attackerBase.name} は大技を放とうとしたが、SPが足りず不発に終わった！\n`;
+                    }
                 }
+            };
+
+            // 💡 スピード勝負！(SPD + 乱数 で行動順を決める)
+            let mySpdRoll = myState.spd + Math.floor(Math.random() * 6);
+            let oppSpdRoll = oppState.spd + Math.floor(Math.random() * 6);
+            let isMyFirst = mySpdRoll >= oppSpdRoll;
+
+            // 素早い方から順番に行動
+            if (isMyFirst) {
+                doAction(true, myAction, oppAction === 'btn_def');
+                if (oppState.hp > 0) doAction(false, oppAction, myAction === 'btn_def');
+            } else {
+                doAction(false, oppAction, myAction === 'btn_def');
+                if (myState.hp > 0) doAction(true, myAction, oppAction === 'btn_def');
             }
 
             turn++;
