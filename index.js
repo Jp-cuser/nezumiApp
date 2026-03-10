@@ -161,6 +161,24 @@ const runeAlphabet = [
     { name:'オサラ (Othala)', symbol:'ᛟ', meaning:'故郷・伝統', upright:'伝統や家族からの恩恵。基盤を固める時だちゅ。', reversed:'執着しすぎに注意。新しい風を取り入れてちゅ。' ,image:'R_24_Othala.jpg'}
 ];
 
+
+// 日本時間を取得する共通関数
+function getJSTInfo() {
+    const now = new Date();
+    // タイムゾーンを指定して日本時間を計算
+    const jstStr = now.toLocaleString("en-US", { timeZone: "Asia/Tokyo" });
+    const jstDate = new Date(jstStr);
+    
+    const y = jstDate.getFullYear();
+    const m = jstDate.getMonth() + 1;
+    const d = jstDate.getDate();
+    
+    return {
+        dateStr: `${y}-${m}-${d}`, // キャッシュキー用 (2026-3-10)
+        displayDate: `${y}/${m}/${d}`, // 表示用 (2026/3/10)
+        seedDate: (y * 10000) + (m * 100) + d // 乱数シード用 (20260310)
+    };
+}
 //********************************************************************タロット*************************************************************************************************************
 // --- [追加] 画像をダウンロードして、必要なら反転させる関数 ---
 async function getCardImage(imageFileName, isReversed) {
@@ -192,7 +210,7 @@ async function getCardImage(imageFileName, isReversed) {
 }
 // 💡 ユーザーIDと日付を組み合わせて、その人専用の「今日の乱数」を作る
 function getPersonalDailyRandom(userId, seedOffset = 0) {
-    const date = new Date();
+    const date = jst.seedDate;
     const dateNum = (date.getFullYear() * 10000) + ((date.getMonth() + 1) * 100) + date.getDate();
     
     // ユーザーID（文字列）を数値に変換して日付と混ぜる
@@ -277,9 +295,10 @@ async function getGeminiReading(cardName, isReversed, username) {
 // 解説を一時保存するキャッシュ用変数
 const readingCache = new Map();
 
-async function getGeminiReading(cardName, isReversed, userId) {
-    const dateStr = new Date().toLocaleDateString();
-    const cacheKey = `${dateStr}-${userId}-${cardName}-${isReversed}`;
+async function getGeminiReading(cardName, isReversed, username) {
+    const jst = getJSTInfo();
+    const dateStr = jst.dateStr; // 💡 日本時間の日付
+    const cacheKey = `tarot-${dateStr}-${username}-${cardName}-${isReversed}`;
 
     // 💡 節約ポイント：今日同じ人が同じカードを引いていたら、再生成せずにキャッシュを返す
     if (readingCache.has(cacheKey)) return readingCache.get(cacheKey);
@@ -300,8 +319,8 @@ async function getGeminiReading(cardName, isReversed, userId) {
     }
 }
 async function getGeminiReading3(cards, username) {
-    const dateStr = new Date().toLocaleDateString();
-    // 3枚のカードIDを組み合わせてキャッシュキーを作成
+    const jst = getJSTInfo();
+    const dateStr = jst.dateStr; // 💡 日本時間の日付
     const cacheKey = `tarot3-${dateStr}-${username}-${cards.map(c => c.name + c.isReversed).join('-')}`;
     
     if (readingCache.has(cacheKey)) return readingCache.get(cacheKey);
@@ -410,16 +429,20 @@ async function getJokeImage(fileName) {
     }
 }
 //*****************************************************************************************星座占い****************************************************************************************************** */
-function getDailyRandom(seed) {
-    const date = new Date();
-    // yyyymmdd形式の数値をシードにする
-    const dateNum = (date.getFullYear() * 10000) + ((date.getMonth() + 1) * 100) + date.getDate();
-    const x = Math.sin(dateNum + seed) * 10000;
+function getDailyRandom(userId, seedOffset = 0) {
+    const jst = getJSTInfo();
+    const dateNum = jst.seedDate; // 💡 サーバー時間ではなく日本時間の日付
+    
+    const userNumericId = parseInt(userId.slice(-8), 10); 
+    const finalSeed = dateNum + userNumericId + seedOffset;
+
+    const x = Math.sin(finalSeed) * 10000;
     return x - Math.floor(x);
 }
 async function getGeminiHoroscopeMessage(topSign, bottomSign) {
-    const dateStr = new Date().toLocaleDateString();
-    const cacheKey = `horoscope-${dateStr}-${topSign}-${bottomSign}`;
+    const jst = getJSTInfo();
+    const dateStr = jst.dateStr; // 💡 日本時間の日付
+    const cacheKey = `full-horoscope-${dateStr}`;
     
     if (readingCache.has(cacheKey)) return readingCache.get(cacheKey);
 
@@ -468,9 +491,13 @@ async function getGeminiFullHoroscope(rankingList) {
 }
 //****************************************************************************************ルーン占い***************************************************************************************************** */
 async function getGeminiRuneReading(runeName, isReversed, username) {
-    const dateStr = new Date().toLocaleDateString();
+    // 💡 修正：new Date().toLocaleDateString() だとサーバー時間（朝9時に切り替わる）になる可能性があるちゅ
+    // 常に日本時間（JST）の「年月日」をキーにするように統一するちゅ！
+    const jst = getJSTInfo();
+    const dateStr = jst.dateStr; // 💡 日本時間の日付
     const cacheKey = `rune-${dateStr}-${username}-${runeName}-${isReversed}`;
     
+    // 以下、既存の処理...
     if (readingCache.has(cacheKey)) return readingCache.get(cacheKey);
 
     const orientation = isReversed ? "逆位置" : "正位置";
