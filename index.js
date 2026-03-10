@@ -394,11 +394,12 @@ async function getJokeImage(fileName) {
 }
 
 //*****************************************************************************************星座占い****************************************************************************************************** */
-function getDailyRandom(userId, seedOffset = 0) {
+// ✅ 修正後（星座占いはみんな共通だから、これだけでOKだちゅ！）
+function getDailyRandom(seedOffset = 0) {
     const jst = getJSTInfo(); 
     const dateNum = jst.seedDate; 
-    const userNumericId = parseInt(userId.slice(-8), 10); 
-    const finalSeed = dateNum + userNumericId + seedOffset;
+    // 💡 ユーザーIDは使わず、日付と星座の番号だけで固定の乱数を作るちゅ
+    const finalSeed = dateNum + seedOffset;
     const x = Math.sin(finalSeed) * 10000;
     return x - Math.floor(x);
 }
