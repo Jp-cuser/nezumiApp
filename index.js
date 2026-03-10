@@ -1247,7 +1247,7 @@ client.on('interactionCreate', async (interaction) => {
     // 💡 【追加】/pet_battle コマンド (PvPバトル)
     // 💡 【超進化】/pet_battle コマンド (マッチ・混乱・SPシステム ＆ AI実況搭載)
     else if (interaction.commandName === 'pet_battle') {
-        await interaction.deferReply();
+        await interaction.deferReply({ ephemeral: true });
         const challengerId = interaction.user.id;
         const opponentUser = interaction.options.getUser('opponent');
         const opponentId = opponentUser.id;
