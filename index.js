@@ -278,7 +278,7 @@ async function getGeminiReading(cardName, isReversed, username) {
     if (readingCache.has(cacheKey)) return readingCache.get(cacheKey);
 
     const orientation = isReversed ? "逆位置" : "正位置";
-    const prompt = `あなたは「ねずみ」という占い師です。引かれたカード：${cardName}の${orientation}。50文字以内で、癒やしのアドバイスを1つだけ言って。語尾は「ちゅ」。`;
+    const prompt = `あなたは「ねずみ」という占い師です。引かれたカード：${cardName}の${orientation}。200文字以内で、癒やしのアドバイスを1つだけ言って。語尾は「ちゅ」。`;
 
     try {
         const result = await model.generateContent(prompt);
@@ -309,7 +309,7 @@ async function getGeminiReading3(cards, username) {
         `${['過去', '現在', '未来'][i]}: ${c.name}(${c.isReversed ? '逆位置' : '正位置'})`
     ).join('、');
 
-    const prompt = `占い師「ねずみ」として、${username}さんの3枚引き（${cardInfo}）を統合して、150文字以内で一言でアドバイスして。最後は「ちゅ」で締めて。`;
+    const prompt = `占い師「ねずみ」として、${username}さんの3枚引き（${cardInfo}）を統合して、400文字以内で一言でアドバイスして。最後は「ちゅ」で締めて。`;
 
     try {
         const result = await model.generateContent(prompt);
@@ -413,7 +413,7 @@ async function getGeminiFullHoroscope(rankingList) {
 
     const rankingInfo = rankingList.map((item, i) => `${i+1}位:${item.name}`).join('、');
     
-    const prompt = `占い師「ねずみ」として、以下の星座ランキング各々に15文字以内で短い一言コメントを、最後に「今日の全体の抱負」を30文字以内で作成して。
+    const prompt = `占い師「ねずみ」として、以下の星座ランキング各々に50文字以内で短い一言コメントを、最後に「今日の全体の抱負」を300文字以内で作成して。
 リスト：${rankingInfo}
 形式：
 1位：コメント
@@ -450,7 +450,7 @@ async function getGeminiRuneReading(runeName, isReversed, username) {
     if (readingCache.has(cacheKey)) return readingCache.get(cacheKey);
 
     const orientation = isReversed ? "逆位置" : "正位置";
-    const prompt = `占い師「ねずみ」として、ルーン文字「${runeName}」の${orientation}が出た${username}さんに、30文字以内で神秘的な助言をして。語尾は「ちゅ」。`;
+    const prompt = `占い師「ねずみ」として、ルーン文字「${runeName}」の${orientation}が出た${username}さんに、300文字以内で神秘的な助言をして。語尾は「ちゅ」。`;
 
     try {
         const result = await model.generateContent(prompt);
