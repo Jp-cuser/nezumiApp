@@ -1278,29 +1278,6 @@ client.on('interactionCreate', async (interaction) => {
         let battleLog = "⚔️ **BATTLE START** ⚔️\n";
         let isGameOver = false;
 
-        const updateEmbed = () => {
-            return new EmbedBuilder()
-                .setColor(0x8B0000) // ダークレッド
-                .setTitle(`🩸 死闘：${interaction.user.username} VS ${opponentUser.username} [ターン${turn}]`)
-                .setDescription(battleLog.length > 1500 ? "..." + battleLog.slice(-1500) : battleLog)
-                .addFields(
-                    { name: `${myPet.emoji} ${myPet.name} (あなた)`, value: `❤️ HP: ${myState.hp}/${myPet.maxHp}\n💫 混乱: ${myState.stagger}/${myPet.staggerMax}\n🧠 SP: ${myState.sp}`, inline: true },
-                    { name: `VS`, value: `⚡`, inline: true },
-                    { name: `${oppPet.emoji} ${oppPet.name} (相手)`, value: `❤️ HP: ${oppState.hp}/${oppPet.maxHp}\n💫 混乱: ${oppState.stagger}/${oppPet.staggerMax}\n🧠 SP: ${oppState.sp}`, inline: true }
-                )
-                .setFooter({ text: '※相手はオート防衛システムで応戦するちゅ！' });
-        };
-
-        SP（精神力）を溜めて一気に解き放つ、一撃必殺のロマン砲だちゅね！！🐭🔥
-
-これを入れれば、「ステータスで勝てない相手の攻撃をひたすら防御で耐え忍び、SPを溜め切った瞬間に防御無視の大技でHPを消し飛ばす」という超ジャイアントキリング（大物食い）戦法が可能になるちゅ！✨
-
-相手（AI）も賢くして、SPが溜まったら高確率で必殺技を撃ってくるようにするちゅ。ヒリヒリ感がさらに倍増するはずだちゅ！
-
-index.js の /pet_battle コマンドの中にある、const getActionRow = () => { ... から collector.on('collect', ... の終わりまで を、以下のコードにまるごと上書きしてほしいちゅ！
-
-🛠️ 修正：必殺技ボタンとSP消費システムの実装
-JavaScript
         // 💡 修正：ボタンを作る部分に「必殺技」を追加！
         const getActionRow = () => {
             return new ActionRowBuilder().addComponents(
