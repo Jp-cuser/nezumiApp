@@ -724,7 +724,7 @@ client.on('interactionCreate', async (interaction) => {
                 { name: 'ねずみのささやき', value: `*「${mouseWhisper}」*` },
                 { name: 'ねずみの特別解説', value: geminiExplanation }
             )
-            .setFooter({ text: `今日（${new Date().toLocaleDateString('ja-JP')}）のお告げはこれって決まってたんだちゅ！` });
+            .setFooter({ text: `今日（${getJSTInfo().displayDate}）のお告げはこれって決まってたんだちゅ！` });
 
         if (imageAttachment) {
             embed.setImage(`attachment://${imageAttachment.name}`);
@@ -776,7 +776,7 @@ client.on('interactionCreate', async (interaction) => {
                 name: '🐭 ねずみの統合リーディング', 
                 value: geminiExplanation || "運命の糸が絡まってうまく読めなかったちゅ…。"
             })
-            .setFooter({ text: `今日（${new Date().toLocaleDateString('ja-JP')}）の運命だちゅ！` });
+            .setFooter({ text: `今日（${getJSTInfo().displayDate}）の運命だちゅ！` });
 
         await interaction.followUp({ embeds: [storyEmbed], ephemeral: isHidden });
     }
@@ -928,7 +928,7 @@ client.on('interactionCreate', async (interaction) => {
 
         const embed = new EmbedBuilder()
             .setColor(0xFFD700)
-            .setTitle(`🐭 ねずみ星座占い（${new Date().toLocaleDateString('ja-JP')}）`)
+            .setTitle(`🐭 ねずみ星座占い（${getJSTInfo().displayDate}）`)
             .setDescription(`**✨ 今日の抱負 ✨**\n「${houfu}」`)
             
         ranking.forEach((item, i) => {
@@ -988,7 +988,7 @@ client.on('interactionCreate', async (interaction) => {
                     { name: '石に刻まれた意味', value: isReversed ? selectedRune.reversed : selectedRune.upright },
                     { name: 'ねずみのお告げ', value: geminiMessage }
                 )
-                .setFooter({ text: `${new Date().toLocaleDateString('ja-JP')} の石の言葉だちゅ！` });
+                .setFooter({ text: `${getJSTInfo().displayDate} の石の言葉だちゅ！` });
 
             await interaction.editReply({ embeds: [embed], files: [attachment] });
         } catch (error) {
@@ -1618,7 +1618,5 @@ client.on('interactionCreate', async (interaction) => {
         await interaction.editReply({ embeds: [embed] });
     }
 });
-
-client.login(process.env.DISCORD_TOKEN);
 
 client.login(process.env.DISCORD_TOKEN);
