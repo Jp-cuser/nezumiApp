@@ -6,7 +6,8 @@ const {
     ActionRowBuilder,
     ButtonBuilder,
     ButtonStyle,
-    StringSelectMenuBuilder // 💡 これを忘れずに追加！
+    StringSelectMenuBuilder,
+    MessageFlags // 💡 【超重要】これを忘れずに追加するちゅ！
 } = require('discord.js');
 const axios = require('axios');
 const sharp = require('sharp');
