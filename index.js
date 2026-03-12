@@ -1628,8 +1628,11 @@ client.on('interactionCreate', async (interaction) => {
         }
     }
 
+    // 💡 【超・軽量爆速版】/horoscope コマンド (Canvasを使った1枚絵の星座占い)
     else if (interaction.commandName === 'horoscope') {
         await interaction.deferReply({ ephemeral: isHidden });
+        await interaction.editReply({ content: '🌌 星座の瞬きを読み解いて、占いボードを描いているちゅ…！🐭🎨' });
+
         const ranking = signs.map((name, index) => {
             const score = Math.floor(getDailyRandom(index) * 100) + 1;
             const itemIdx = Math.floor(getDailyRandom(index + 100) * luckyItems.length);
@@ -1641,34 +1644,156 @@ client.on('interactionCreate', async (interaction) => {
         const lines = fullMessage.split('\n');
         
         const houfuLine = lines.find(l => l.includes('抱負'));
-        const houfu = houfuLine ? (houfuLine.split(/[：:]/)[1] || houfuLine).replace(/\*/g, '').trim() : "楽しく過ごそうちゅ！";
+        const rawHoufu = houfuLine ? (houfuLine.split(/[：:]/)[1] || houfuLine).replace(/\*/g, '').trim() : "楽しく過ごそうちゅ！";
 
-        const embed = new EmbedBuilder()
-            .setColor(0xFFD700)
-            .setTitle(`🐭 ねずみ星座占い（${getJSTInfo().displayDate}）`)
-            .setDescription(`**✨ 今日の抱負 ✨**\n「${houfu}」`)
+        // 💡 絵文字を取り除く魔法（Canvasの文字化け防止！）
+        const stripEmoji = (str) => str.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '').replace(/[\u2600-\u27BF]/g, '').trim();
+        const safeHoufu = stripEmoji(rawHoufu);
+
+        try {
+            const canvasWidth = 800;
+            const dummyCanvas = createCanvas(1, 1);
+            const dummyCtx = dummyCanvas.getContext('2d');
             
-        ranking.forEach((item, i) => {
-            const medal = i === 0 ? '🥇 ' : i === 1 ? '🥈 ' : i === 2 ? '🥉 ' : `第${i+1}位: `;
-            const targetLine = lines.find(l => l.includes(`${i+1}位`));
-            let comment = "応援してるちゅ！";
-            if (targetLine) {
-                const parts = targetLine.split(/[：:]/);
-                if (parts.length > 1) {
-                    comment = parts.slice(1).join(':').replace(/\*/g, '').trim();
-                } else {
-                    comment = targetLine.replace(new RegExp(`.*${i+1}位.*`), '').replace(/\*/g, '').trim();
+            // 💡 1. 抱負の高さと、各星座のパネル高さを事前計算するちゅ！
+            dummyCtx.font = 'italic 20px NotoSansJP';
+            const houfuHeight = measureTextHeight(dummyCtx, safeHoufu, canvasWidth - 120, 28);
+            
+            const headerHeight = 180 + houfuHeight; // タイトル + 抱負エリアの高さ
+            
+            const panelsData = [];
+            let totalPanelsHeight = 0;
+            const panelPadding = 20;
+
+            for (let i = 0; i < ranking.length; i++) {
+                const item = ranking[i];
+                
+                // 順位ごとのコメントを探すちゅ
+                const targetLine = lines.find(l => l.includes(`${i+1}位`));
+                let comment = "応援してるちゅ！";
+                if (targetLine) {
+                    const parts = targetLine.split(/[：:]/);
+                    if (parts.length > 1) {
+                        comment = parts.slice(1).join(':').replace(/\*/g, '').trim();
+                    } else {
+                        comment = targetLine.replace(new RegExp(`.*${i+1}位.*`), '').replace(/\*/g, '').trim();
+                    }
                 }
+                // 星座名が被っていたら消してスッキリさせるちゅ
+                comment = comment.replace(new RegExp(`${item.name}[:：]?`), '').trim();
+                const safeComment = stripEmoji(comment);
+
+                dummyCtx.font = '18px NotoSansJP';
+                const commentWidth = canvasWidth - 120;
+                const commentHeight = measureTextHeight(dummyCtx, safeComment, commentWidth, 26);
+                
+                // 1〜3位はラッキーアイテムも表示するから高さを広めにとるちゅ
+                const isTop3 = i < 3;
+                const extraHeight = isTop3 ? 30 : 0;
+                const panelHeight = 40 + commentHeight + extraHeight + panelPadding * 2;
+                
+                panelsData.push({
+                    rankNum: i + 1,
+                    name: item.name,
+                    score: item.score,
+                    luckyItem: item.luckyItem,
+                    comment: safeComment,
+                    panelHeight,
+                    isTop3
+                });
+                
+                totalPanelsHeight += panelHeight + 15;
             }
 
-            if (i < 3) {
-                embed.addFields({ name: `${medal}${item.name} (${item.score}点)`, value: `💬 ${comment}\n🎁 アイテム: \`${item.luckyItem}\`` });
-            } else {
-                embed.addFields({ name: `${medal}${item.name}`, value: `💬 ${comment}`, inline: true });
-            }
-        });
+            const footerHeight = 60;
+            const canvasHeight = headerHeight + totalPanelsHeight + footerHeight;
 
-        await interaction.editReply({ embeds: [embed] });
+            // 💡 2. キャンバスを作って描画スタート！
+            const canvas = createCanvas(canvasWidth, canvasHeight);
+            const ctx = canvas.getContext('2d');
+
+            ctx.fillStyle = '#1e1e24';
+            ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+            ctx.strokeStyle = '#FFD700';
+            ctx.lineWidth = 10;
+            ctx.strokeRect(0, 0, canvasWidth, canvasHeight);
+
+            // ヘッダー（タイトル）
+            ctx.textAlign = 'center';
+            ctx.font = 'bold 36px NotoSansJP';
+            ctx.fillStyle = '#FFD700';
+            ctx.fillText(`ねずみ星座占い（${getJSTInfo().displayDate}）`, canvasWidth / 2, 60);
+
+            // 💡 抱負エリア
+            ctx.fillStyle = '#2b2d31';
+            ctx.fillRect(40, 90, canvasWidth - 80, 50 + houfuHeight);
+            ctx.strokeStyle = '#FFD700';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(40, 90, canvasWidth - 80, 50 + houfuHeight);
+
+            ctx.font = 'bold 22px NotoSansJP';
+            ctx.fillStyle = '#FFD700';
+            ctx.fillText('今日の抱負', canvasWidth / 2, 125);
+            
+            ctx.textAlign = 'left';
+            ctx.font = 'italic 20px NotoSansJP';
+            ctx.fillStyle = '#ffffff';
+            drawCanvasText(ctx, safeHoufu, 60, 160, canvasWidth - 120, 28);
+
+            // 💡 各星座のパネルを描画
+            let currentY = headerHeight;
+            const startX = 40;
+            const panelWidth = canvasWidth - 80;
+
+            for (let i = 0; i < panelsData.length; i++) {
+                const day = panelsData[i];
+                
+                // パネルの背景色と枠線 (1位:金, 2位:銀, 3位:銅, 4位以下:グレー)
+                ctx.fillStyle = i === 0 ? '#3a3515' : i === 1 ? '#2a2a2a' : i === 2 ? '#362210' : '#2b2d31';
+                ctx.fillRect(startX, currentY, panelWidth, day.panelHeight);
+                ctx.strokeStyle = i === 0 ? '#FFD700' : i === 1 ? '#C0C0C0' : i === 2 ? '#CD7F32' : '#444';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(startX, currentY, panelWidth, day.panelHeight);
+
+                // 星座名と順位
+                ctx.textAlign = 'left';
+                ctx.font = 'bold 24px NotoSansJP';
+                ctx.fillStyle = i === 0 ? '#FFD700' : i === 1 ? '#C0C0C0' : i === 2 ? '#CD7F32' : '#87CEEB';
+                
+                const scoreText = day.isTop3 ? ` (${day.score}点)` : '';
+                ctx.fillText(`第${day.rankNum}位 : ${day.name}${scoreText}`, startX + 20, currentY + 35);
+
+                // コメント
+                ctx.fillStyle = '#e0e0e0';
+                ctx.font = '18px NotoSansJP';
+                let nextY = drawCanvasText(ctx, day.comment, startX + 20, currentY + 70, panelWidth - 40, 26);
+
+                // ラッキーアイテム (Top 3 のみ表示)
+                if (day.isTop3) {
+                    ctx.fillStyle = '#FFB6C1';
+                    ctx.font = 'bold 18px NotoSansJP';
+                    ctx.fillText(`ラッキーアイテム: ${day.luckyItem}`, startX + 20, nextY + 10);
+                }
+
+                currentY += day.panelHeight + 15;
+            }
+
+            // フッター
+            ctx.textAlign = 'right';
+            ctx.font = '16px NotoSansJP';
+            ctx.fillStyle = '#888';
+            ctx.fillText(`今日調べた運勢だちゅ！`, canvasWidth - 30, canvasHeight - 20);
+
+            // PNG画像に変換！
+            const pngBuffer = await canvas.encode('png');
+            const attachment = new AttachmentBuilder(pngBuffer, { name: 'horoscope_canvas.png' });
+
+            await interaction.editReply({ content: 'お待たせしたちゅ！今日の星座ランキングだちゅ！✨', embeds: [], files: [attachment] });
+
+        } catch (error) {
+            console.error('Canvas星座占いエラー:', error);
+            await interaction.editReply({ content: '星の軌道を計算中に、望遠鏡が壊れちゃったちゅ…。' });
+        }
     }
 
     else if (interaction.commandName === 'rune') {
