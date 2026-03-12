@@ -904,11 +904,12 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     // 💡 【超・軽量爆速版】/tarot3 コマンド (Canvasを使った1枚画像生成・レイアウト修正版)
+    // 💡 【究極高速・絶対崩れない版】/tarot3 コマンド (Sharpでの画像連結 ＋ Discord Embed箇条書き)
     else if (interaction.commandName === 'tarot3') {
         await interaction.deferReply({ ephemeral: isHidden });
-        await interaction.editReply({ content: '🌌 星の導きを読み解きながら、1枚の絵を描いているちゅ…！🐭🎨' });
+        await interaction.editReply({ content: '🌌 星の導きを読み解いているちゅ…！少しだけ待っててね！🐭✨' });
 
-        const positions = ['過去', '現在', '未来']; // 💡 絵文字を消したちゅ！
+        const positions = ['過去 🕰️', '現在 📍', '未来 🚀'];
         const drawnResults = []; 
         let tempDeck = [...tarotCards];
 
@@ -923,127 +924,79 @@ client.on('interactionCreate', async (interaction) => {
             drawnResults.push({ name: card.name, isReversed: isReversed, card: card, position: positions[i] });
         }
 
-        const geminiPromise = getGeminiReading3(drawnResults, interaction.user.username);
-        const storyResult = generateTarotStory(drawnResults[0], drawnResults[1], drawnResults[2]);
-        const geminiExplanation = await geminiPromise;
-        const finalExplanation = geminiExplanation || "運命の糸が絡まってうまく読めなかったちゅ…。";
+        // ① 画像の処理（Sharpを使って、3枚のカードを横に並べた1枚の画像を作る）
+        const createCompositeImage = async () => {
+            try {
+                const imageBuffers = await Promise.all(drawnResults.map(async (result) => {
+                    const imagePath = path.join(__dirname, 'images', result.card.image);
+                    if (!fs.existsSync(imagePath)) return null;
+                    let transform = sharp(imagePath).resize(200, 344); 
+                    if (result.isReversed) transform = transform.rotate(180);
+                    return await transform.toBuffer();
+                }));
 
-        // 💡 絵文字（サロゲートペア）を取り除く魔法の関数だちゅ！
-        const stripEmoji = (str) => str.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '').replace(/[\u2600-\u27BF]/g, '');
-
-        try {
-            const canvasWidth = 840;
-            const canvasHeight = 1100; // 💡 900から1100に縦に長く広げたちゅ！
-            const canvas = createCanvas(canvasWidth, canvasHeight);
-            const ctx = canvas.getContext('2d');
-
-            // 背景
-            ctx.fillStyle = '#1e1e24';
-            ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-            // 枠線
-            ctx.strokeStyle = '#5865F2';
-            ctx.lineWidth = 10;
-            ctx.strokeRect(0, 0, canvasWidth, canvasHeight);
-
-            // タイトル
-            ctx.textAlign = 'center';
-            ctx.font = 'bold 36px NotoSansJP';
-            ctx.fillStyle = '#FFD700';
-            // 💡 絵文字を消して描画
-            ctx.fillText(`${interaction.user.username}さんの運命の3枚引き`, canvasWidth / 2, 60);
-
-            // 3枚のカードを描画
-            const startX = 60;
-            const cardWidth = 200;
-            const cardHeight = 344;
-            const gap = 60;
-
-            for (let i = 0; i < 3; i++) {
-                const result = drawnResults[i];
-                const cx = startX + (cardWidth + gap) * i;
-                const centerX = cx + cardWidth / 2;
-
-                // ポジション
-                ctx.textAlign = 'center';
-                ctx.font = 'bold 24px NotoSansJP';
-                ctx.fillStyle = '#00FA9A';
-                ctx.fillText(result.position, centerX, 120);
-
-                // カード画像
-                const imagePath = path.join(__dirname, 'images', result.card.image);
-                if (fs.existsSync(imagePath)) {
-                    const img = await loadImage(imagePath);
-                    ctx.save();
-                    ctx.translate(cx + cardWidth / 2, 140 + cardHeight / 2);
-                    if (result.isReversed) ctx.rotate(Math.PI); 
-                    ctx.drawImage(img, -cardWidth / 2, -cardHeight / 2, cardWidth, cardHeight);
-                    ctx.restore();
-                } else {
-                    ctx.fillStyle = '#333';
-                    ctx.fillRect(cx, 140, cardWidth, cardHeight);
-                    ctx.fillStyle = '#fff';
-                    ctx.font = '16px NotoSansJP';
-                    ctx.fillText('画像なし', centerX, 140 + cardHeight / 2);
+                const compositeList = [];
+                for (let i = 0; i < 3; i++) {
+                    if (imageBuffers[i]) {
+                        compositeList.push({
+                            input: imageBuffers[i],
+                            top: 0,
+                            left: i * 220 // 20pxの隙間を空けて綺麗に並べるちゅ
+                        });
+                    }
                 }
 
-                // カード名
-                ctx.font = 'bold 20px NotoSansJP';
-                ctx.fillStyle = '#ffffff';
-                ctx.fillText(result.card.name, centerX, 520);
+                if (compositeList.length === 0) return null;
 
-                // 正逆
-                ctx.font = '18px NotoSansJP';
-                ctx.fillStyle = result.isReversed ? '#FF6347' : '#e0e0e0';
-                ctx.fillText(result.isReversed ? '逆位置' : '正位置', centerX, 550); // 💡 絵文字を消したちゅ
+                return await sharp({
+                    create: { width: 640, height: 344, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } }
+                })
+                .composite(compositeList)
+                .png()
+                .toBuffer();
+            } catch (e) {
+                console.error("画像合成エラー:", e);
+                return null;
             }
+        };
 
-            // 解説エリアの背景
-            ctx.fillStyle = '#2b2d31';
-            // 💡 枠の高さも 280から460 に大きく広げたちゅ！
-            ctx.fillRect(40, 580, canvasWidth - 80, 460);
-            ctx.strokeStyle = '#444';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(40, 580, canvasWidth - 80, 460);
+        // ② Geminiの占い処理
+        const geminiPromise = getGeminiReading3(drawnResults, interaction.user.username);
 
-            // 解説テキストの描画
-            ctx.textAlign = 'left';
-            ctx.font = 'bold 24px NotoSansJP';
-            ctx.fillStyle = '#5865F2';
-            ctx.fillText(`あなたの物語: ${stripEmoji(storyResult.storyType)}`, 60, 620);
+        // 画像の合成と占いを同時に待つ！
+        const [finalImageBuffer, geminiExplanation] = await Promise.all([createCompositeImage(), geminiPromise]);
 
-            ctx.font = 'italic 18px NotoSansJP';
-            ctx.fillStyle = '#e0e0e0';
-            let textY = drawCanvasText(ctx, storyResult.message, 60, 655, canvasWidth - 120, 26);
+        const finalExplanation = geminiExplanation || "運命の糸が絡まってうまく読めなかったちゅ…。";
+        const storyResult = generateTarotStory(drawnResults[0], drawnResults[1], drawnResults[2]);
 
-            textY += 20;
-            ctx.font = 'bold 22px NotoSansJP';
-            ctx.fillStyle = '#e0e0e0';
-            ctx.fillText('ねずみの統合リーディング', 60, textY);
+        // 💡 修正：横並び（addFields）をやめて、説明文にスッキリまとめるちゅ！
+        // これでスマホでもPCでも絶対にレイアウトが崩れないちゅ！
+        const embed = new EmbedBuilder()
+            .setColor(0x5865F2)
+            .setTitle(`✨ ${interaction.user.username}さんの運命の3枚引き ✨`)
+            .setDescription(
+                `**【引いたカード】**\n` +
+                `🕰️ **過去:** ${drawnResults[0].card.name} (${drawnResults[0].isReversed ? '逆位置 🙃' : '正位置 ✨'})\n` +
+                `📍 **現在:** ${drawnResults[1].card.name} (${drawnResults[1].isReversed ? '逆位置 🙃' : '正位置 ✨'})\n` +
+                `🚀 **未来:** ${drawnResults[2].card.name} (${drawnResults[2].isReversed ? '逆位置 🙃' : '正位置 ✨'})\n\n` +
+                `**📖 あなたの物語: ${storyResult.storyType}**\n` +
+                `*${storyResult.message}*\n\n` +
+                `**🐭 ねずみの統合リーディング**\n` +
+                `${finalExplanation}`
+            )
+            .setFooter({ text: `今日（${getJSTInfo().displayDate}）の運命だちゅ！` });
 
-            textY += 35;
-            ctx.font = '18px NotoSansJP';
-            ctx.fillStyle = '#ffffff';
-            
-            // 💡 AIの文章が長すぎた場合はカットし、絵文字も安全に取り除くちゅ！
-            const shortExp = finalExplanation.length > 400 ? finalExplanation.slice(0, 400) + '...' : finalExplanation;
-            const safeExp = stripEmoji(shortExp);
-            drawCanvasText(ctx, safeExp, 60, textY, canvasWidth - 120, 26);
-
-            // 日付
-            ctx.textAlign = 'right';
-            ctx.font = '16px NotoSansJP';
-            ctx.fillStyle = '#888';
-            ctx.fillText(`今日（${getJSTInfo().displayDate}）の運命だちゅ！`, canvasWidth - 50, canvasHeight - 20);
-
-            const pngBuffer = await canvas.encode('png');
-            const attachment = new AttachmentBuilder(pngBuffer, { name: 'tarot3_canvas.png' });
-
-            await interaction.editReply({ content: 'お待たせしたちゅ！あなたの運命の3枚引きだちゅ！✨', files: [attachment] });
-
-        } catch (error) {
-            console.error('Canvas描画エラー:', error);
-            await interaction.editReply({ content: '絵を描く途中で筆が折れちゃったちゅ…。ログを確認してちゅ💦' });
+        const replyOptions = { content: 'お待たせしたちゅ！あなたの運命だちゅ！✨' };
+        if (finalImageBuffer) {
+            const attachment = new AttachmentBuilder(finalImageBuffer, { name: 'tarot3_cards.png' });
+            embed.setImage('attachment://tarot3_cards.png');
+            replyOptions.embeds = [embed];
+            replyOptions.files = [attachment];
+        } else {
+            replyOptions.embeds = [embed];
         }
+
+        await interaction.editReply(replyOptions);
     }
     else if (interaction.commandName === 'hitandblow') {
         await interaction.deferReply({ ephemeral: isHidden });
