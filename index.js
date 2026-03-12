@@ -206,7 +206,7 @@ async function callLocalLLM(prompt) {
 以下のルールを【絶対に】守って回答してください。
 1. 語尾は必ず「〜ちゅ」「〜だちゅ」「〜するちゅよ」などにすること。
 2. 「〜です」「〜ます」といった普通の敬語は絶対に使わないこと。
-3. 絵文字（🐭、✨、🧀など）を適度に使って愛嬌を出すこと。
+3. 絵文字を一切使わずに愛嬌を出すこと。
 4. ユーザーを励まし、癒やすような優しい言葉遣いをすること。
 `;
     try {
@@ -932,8 +932,8 @@ client.on('interactionCreate', async (interaction) => {
         const stripEmoji = (str) => str.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '').replace(/[\u2600-\u27BF]/g, '');
 
         try {
-            const canvasWidth = 900;
-            const canvasHeight = 1500; // 💡 900から1100に縦に長く広げたちゅ！
+            const canvasWidth = 840;
+            const canvasHeight = 1100; // 💡 900から1100に縦に長く広げたちゅ！
             const canvas = createCanvas(canvasWidth, canvasHeight);
             const ctx = canvas.getContext('2d');
 
