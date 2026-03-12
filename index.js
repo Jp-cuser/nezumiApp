@@ -278,7 +278,30 @@ function drawCanvasText(ctx, text, x, y, maxWidth, lineHeight) {
     }
     return currentY;
 }
-
+// 💡 【追加】事前に文章の高さを計算して、キャンバスの大きさを決める魔法だちゅ！
+function measureTextHeight(ctx, text, maxWidth, lineHeight) {
+    const paragraphs = text.split('\n');
+    let height = 0;
+    for (const p of paragraphs) {
+        if (p === '') {
+            height += lineHeight;
+            continue;
+        }
+        let line = '';
+        for (let i = 0; i < p.length; i++) {
+            const testLine = line + p[i];
+            const metrics = ctx.measureText(testLine);
+            if (metrics.width > maxWidth && i > 0) {
+                height += lineHeight;
+                line = p[i];
+            } else {
+                line = testLine;
+            }
+        }
+        height += lineHeight;
+    }
+    return height;
+}
 // 💡 【追加】おあいそゲームの状態管理用Map (ユーザーIDをキーにするちゅ)
 const oaisoGames = new Map();
 //********************************************************************タロット*************************************************************************************************************
@@ -906,11 +929,12 @@ client.on('interactionCreate', async (interaction) => {
     // 💡 【超・軽量爆速版】/tarot3 コマンド (Canvasを使った1枚画像生成・レイアウト修正版)
     // 💡 【究極高速・絶対崩れない版】/tarot3 コマンド (Sharpでの画像連結 ＋ Discord Embed箇条書き)
     // 💡 【超・軽量爆速版】/tarot3 コマンド (Canvasを使った1枚画像生成・アスペクト比維持版)
+    // 💡 【究極完成版】/tarot3 コマンド (アスペクト比維持＆空白ゼロの動的レイアウト)
     else if (interaction.commandName === 'tarot3') {
         await interaction.deferReply({ ephemeral: isHidden });
         await interaction.editReply({ content: '🌌 星の導きを読み解きながら、1枚の絵を描いているちゅ…！🐭🎨' });
 
-        const positions = ['過去', '現在', '未来']; // 絵文字なしの安全なポジション名
+        const positions = ['過去', '現在', '未来'];
         const drawnResults = []; 
         let tempDeck = [...tarotCards];
 
@@ -927,27 +951,68 @@ client.on('interactionCreate', async (interaction) => {
 
         const geminiPromise = getGeminiReading3(drawnResults, interaction.user.username);
         const storyResult = generateTarotStory(drawnResults[0], drawnResults[1], drawnResults[2]);
-        const geminiExplanation = await geminiPromise;
-        const finalExplanation = geminiExplanation || "運命の糸が絡まってうまく読めなかったちゅ…。";
-
-        // 絵文字を取り除く魔法の関数
+        
+        // 絵文字を取り除く魔法
         const stripEmoji = (str) => str.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '').replace(/[\u2600-\u27BF]/g, '');
 
         try {
+            // 💡 1. 最初に画像を全部読み込んで、一番背が高いカードのサイズ（maxDrawHeight）を計算するちゅ！
+            const loadedImages = [];
+            let maxDrawHeight = 0;
+            const cardWidth = 200;
+
+            for (let i = 0; i < 3; i++) {
+                const imagePath = path.join(__dirname, 'images', drawnResults[i].card.image);
+                if (fs.existsSync(imagePath)) {
+                    const img = await loadImage(imagePath);
+                    loadedImages.push(img);
+                    const aspectRatio = img.width / img.height;
+                    const drawHeight = cardWidth / Math.max(0.1, aspectRatio); // アスペクト比を維持！
+                    if (drawHeight > maxDrawHeight) maxDrawHeight = drawHeight;
+                } else {
+                    loadedImages.push(null);
+                    if (344 > maxDrawHeight) maxDrawHeight = 344;
+                }
+            }
+
+            // AIの文章を待つちゅ
+            const geminiExplanation = await geminiPromise;
+            const finalExplanation = geminiExplanation || "運命の糸が絡まってうまく読めなかったちゅ…。";
+            const shortExp = finalExplanation.length > 400 ? finalExplanation.slice(0, 400) + '...' : finalExplanation;
+            const safeExp = stripEmoji(shortExp);
+
+            // 💡 2. 文章の高さを測って、全体のキャンバスサイズをピッタリ決めるちゅ！
+            const dummyCanvas = createCanvas(1, 1);
+            const dummyCtx = dummyCanvas.getContext('2d');
+            
+            dummyCtx.font = 'italic 18px NotoSansJP';
+            const storyHeight = measureTextHeight(dummyCtx, storyResult.message, 840 - 120, 26);
+            
+            dummyCtx.font = '18px NotoSansJP';
+            const expHeight = measureTextHeight(dummyCtx, safeExp, 840 - 120, 26);
+
+            const boxPadding = 40;
+            // 枠の中の文字の高さを全部足し算するちゅ
+            const boxContentHeight = 24 + 15 + storyHeight + 25 + 22 + 15 + expHeight;
+            const boxHeight = boxContentHeight + boxPadding * 2;
+
+            // カードの開始位置と、解説枠の開始位置
+            const cardAreaTop = 140;
+            const boxStartY = cardAreaTop + maxDrawHeight + 90; // 💡 カードの高さに合わせて枠を上に詰めるちゅ！
+            
             const canvasWidth = 840;
-            const canvasHeight = 1100; // 縦長に広げたキャンバス
+            const canvasHeight = boxStartY + boxHeight + 50; // 余白を足して最終的なキャンバスサイズを決定！
+
+            // 💡 3. ピッタリサイズのキャンバスを作って描画スタート！
             const canvas = createCanvas(canvasWidth, canvasHeight);
             const ctx = canvas.getContext('2d');
 
-            // 背景
             ctx.fillStyle = '#1e1e24';
             ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-            // 枠線
             ctx.strokeStyle = '#5865F2';
             ctx.lineWidth = 10;
             ctx.strokeRect(0, 0, canvasWidth, canvasHeight);
 
-            // タイトル
             ctx.textAlign = 'center';
             ctx.font = 'bold 36px NotoSansJP';
             ctx.fillStyle = '#FFD700';
@@ -955,7 +1020,6 @@ client.on('interactionCreate', async (interaction) => {
 
             // 3枚のカードを描画
             const startX = 60;
-            const cardWidth = 200; // 💡 描画する「幅」は200pxに固定するちゅ
             const gap = 60;
 
             for (let i = 0; i < 3; i++) {
@@ -963,80 +1027,62 @@ client.on('interactionCreate', async (interaction) => {
                 const cx = startX + (cardWidth + gap) * i;
                 const centerX = cx + cardWidth / 2;
 
-                // ポジション
                 ctx.textAlign = 'center';
                 ctx.font = 'bold 24px NotoSansJP';
                 ctx.fillStyle = '#00FA9A';
                 ctx.fillText(result.position, centerX, 120);
 
-                // カード画像の読み込みと描画（アスペクト比維持！）
-                const imagePath = path.join(__dirname, 'images', result.card.image);
-                if (fs.existsSync(imagePath)) {
-                    const img = await loadImage(imagePath); // 元画像を読み込む
-
-                    // 💡 【ここが魔法！】元画像のアスペクト比を計算するちゅ！
+                const img = loadedImages[i];
+                if (img) {
                     const aspectRatio = img.width / img.height;
-                    // 💡 幅200pxに対して、アスペクト比を保った高さを計算するちゅ！
                     const drawHeight = cardWidth / aspectRatio;
-
+                    
                     ctx.save();
-                    // 回転の基準点をカードの中心にするちゅ。高さは計算した `drawHeight` を使うちゅ！
-                    ctx.translate(cx + cardWidth / 2, 140 + drawHeight / 2);
-                    if (result.isReversed) ctx.rotate(Math.PI); // 180度回転
-                    // 💡 計算した `cardWidth` と `drawHeight` で描画するちゅ！これで歪まないちゅ！
+                    // 💡 画像の中心を「一番高いカードの中央」に合わせることで、ガタガタにならないようにするちゅ！
+                    const yOffset = (maxDrawHeight - drawHeight) / 2;
+                    ctx.translate(cx + cardWidth / 2, cardAreaTop + yOffset + drawHeight / 2);
+                    if (result.isReversed) ctx.rotate(Math.PI); 
                     ctx.drawImage(img, -cardWidth / 2, -drawHeight / 2, cardWidth, drawHeight);
                     ctx.restore();
-
-                    // カード名と正逆の描画位置（Y座標）を、画像の高さに合わせて調整するちゅ
-                    const textYStart = 140 + drawHeight + 30;
-
-                    // カード名
-                    ctx.font = 'bold 20px NotoSansJP';
-                    ctx.fillStyle = '#ffffff';
-                    ctx.fillText(result.card.name, centerX, textYStart);
-
-                    // 正逆
-                    ctx.font = '18px NotoSansJP';
-                    ctx.fillStyle = result.isReversed ? '#FF6347' : '#e0e0e0';
-                    ctx.fillText(result.isReversed ? '逆位置' : '正位置', centerX, textYStart + 30);
-
                 } else {
-                    // 画像がない場合の代替描画（高さは仮に344にしておくちゅ）
                     ctx.fillStyle = '#333';
-                    ctx.fillRect(cx, 140, cardWidth, 344);
+                    ctx.fillRect(cx, cardAreaTop, cardWidth, 344);
                     ctx.fillStyle = '#fff';
                     ctx.font = '16px NotoSansJP';
-                    ctx.fillText('画像なし', centerX, 140 + 344 / 2);
-
-                    const textYStart = 140 + 344 + 30;
-                    ctx.font = 'bold 20px NotoSansJP';
-                    ctx.fillStyle = '#ffffff';
-                    ctx.fillText(result.card.name, centerX, textYStart);
-                    ctx.font = '18px NotoSansJP';
-                    ctx.fillStyle = result.isReversed ? '#FF6347' : '#e0e0e0';
-                    ctx.fillText(result.isReversed ? '逆位置' : '正位置', centerX, textYStart + 30);
+                    ctx.fillText('画像なし', centerX, cardAreaTop + 344 / 2);
                 }
+
+                // 💡 カードの下の文字も、一番高いカード（maxDrawHeight）を基準に揃えるちゅ！
+                const textYStart = cardAreaTop + maxDrawHeight + 35;
+                ctx.font = 'bold 20px NotoSansJP';
+                ctx.fillStyle = '#ffffff';
+                ctx.fillText(result.card.name, centerX, textYStart);
+
+                ctx.font = '18px NotoSansJP';
+                ctx.fillStyle = result.isReversed ? '#FF6347' : '#e0e0e0';
+                ctx.fillText(result.isReversed ? '逆位置' : '正位置', centerX, textYStart + 30);
             }
 
             // 解説エリアの背景
             ctx.fillStyle = '#2b2d31';
-            ctx.fillRect(40, 680, canvasWidth - 80, 360); // 💡 画像の下の余白に合わせて、開始位置（Y）を下に下げたちゅ！
+            ctx.fillRect(40, boxStartY, canvasWidth - 80, boxHeight);
             ctx.strokeStyle = '#444';
             ctx.lineWidth = 2;
-            ctx.strokeRect(40, 680, canvasWidth - 80, 360);
+            ctx.strokeRect(40, boxStartY, canvasWidth - 80, boxHeight);
 
             // 解説テキストの描画
+            let textY = boxStartY + 45; // 枠内のスタート位置
             ctx.textAlign = 'left';
             ctx.font = 'bold 24px NotoSansJP';
             ctx.fillStyle = '#5865F2';
-            ctx.fillText(`あなたの物語: ${stripEmoji(storyResult.storyType)}`, 60, 720); // 💡 Y座標を調整
+            ctx.fillText(`あなたの物語: ${stripEmoji(storyResult.storyType)}`, 60, textY);
 
+            textY += 35;
             ctx.font = 'italic 18px NotoSansJP';
             ctx.fillStyle = '#e0e0e0';
-            // 💡 `drawCanvasText` は、描画が終わった最終的なY座標を返すから、それを `textY` に保存するちゅ！
-            let textY = drawCanvasText(ctx, storyResult.message, 60, 755, canvasWidth - 120, 26); // 💡 Y座標を調整
+            textY = drawCanvasText(ctx, storyResult.message, 60, textY, canvasWidth - 120, 26);
 
-            textY += 20;
+            textY += 25;
             ctx.font = 'bold 22px NotoSansJP';
             ctx.fillStyle = '#e0e0e0';
             ctx.fillText('ねずみの統合リーディング', 60, textY);
@@ -1044,11 +1090,6 @@ client.on('interactionCreate', async (interaction) => {
             textY += 35;
             ctx.font = '18px NotoSansJP';
             ctx.fillStyle = '#ffffff';
-            
-            // AIの文章が長すぎた場合はカットし、絵文字も安全に取り除くちゅ！
-            const shortExp = finalExplanation.length > 400 ? finalExplanation.slice(0, 400) + '...' : finalExplanation;
-            const safeExp = stripEmoji(shortExp);
-            // 💡 統合リーディングを描画するちゅ！ここも折り返し計算をするちゅ！
             drawCanvasText(ctx, safeExp, 60, textY, canvasWidth - 120, 26);
 
             // 日付
