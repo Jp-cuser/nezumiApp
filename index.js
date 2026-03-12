@@ -903,14 +903,12 @@ client.on('interactionCreate', async (interaction) => {
         }
     }
 
-    // 💡 【超進化】/tarot3 コマンド (satoriによる1枚画像出力)
-    // 💡 【超進化・修正版】/tarot3 コマンド (satoriによる1枚画像出力)
-    // 💡 【超・軽量爆速版】/tarot3 コマンド (Canvasを使った1枚画像生成)
+    // 💡 【超・軽量爆速版】/tarot3 コマンド (Canvasを使った1枚画像生成・レイアウト修正版)
     else if (interaction.commandName === 'tarot3') {
         await interaction.deferReply({ ephemeral: isHidden });
         await interaction.editReply({ content: '🌌 星の導きを読み解きながら、1枚の絵を描いているちゅ…！🐭🎨' });
 
-        const positions = ['過去 🕰️', '現在 📍', '未来 🚀'];
+        const positions = ['過去', '現在', '未来']; // 💡 絵文字を消したちゅ！
         const drawnResults = []; 
         let tempDeck = [...tarotCards];
 
@@ -925,20 +923,21 @@ client.on('interactionCreate', async (interaction) => {
             drawnResults.push({ name: card.name, isReversed: isReversed, card: card, position: positions[i] });
         }
 
-        // Geminiの占い処理を裏側でスタート
         const geminiPromise = getGeminiReading3(drawnResults, interaction.user.username);
         const storyResult = generateTarotStory(drawnResults[0], drawnResults[1], drawnResults[2]);
         const geminiExplanation = await geminiPromise;
         const finalExplanation = geminiExplanation || "運命の糸が絡まってうまく読めなかったちゅ…。";
 
+        // 💡 絵文字（サロゲートペア）を取り除く魔法の関数だちゅ！
+        const stripEmoji = (str) => str.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '').replace(/[\u2600-\u27BF]/g, '');
+
         try {
-            // 💡 ここからCanvasを使った超軽量・爆速の画像生成だちゅ！
-            const canvasWidth = 840;
-            const canvasHeight = 900;
+            const canvasWidth = 900;
+            const canvasHeight = 1500; // 💡 900から1100に縦に長く広げたちゅ！
             const canvas = createCanvas(canvasWidth, canvasHeight);
             const ctx = canvas.getContext('2d');
 
-            // 背景を暗いグレーで塗る
+            // 背景
             ctx.fillStyle = '#1e1e24';
             ctx.fillRect(0, 0, canvasWidth, canvasHeight);
             // 枠線
@@ -950,7 +949,8 @@ client.on('interactionCreate', async (interaction) => {
             ctx.textAlign = 'center';
             ctx.font = 'bold 36px NotoSansJP';
             ctx.fillStyle = '#FFD700';
-            ctx.fillText(`✨ ${interaction.user.username}さんの運命の3枚引き ✨`, canvasWidth / 2, 60);
+            // 💡 絵文字を消して描画
+            ctx.fillText(`${interaction.user.username}さんの運命の3枚引き`, canvasWidth / 2, 60);
 
             // 3枚のカードを描画
             const startX = 60;
@@ -963,22 +963,19 @@ client.on('interactionCreate', async (interaction) => {
                 const cx = startX + (cardWidth + gap) * i;
                 const centerX = cx + cardWidth / 2;
 
-                // ポジション（過去・現在・未来）
+                // ポジション
                 ctx.textAlign = 'center';
                 ctx.font = 'bold 24px NotoSansJP';
                 ctx.fillStyle = '#00FA9A';
                 ctx.fillText(result.position, centerX, 120);
 
-                // カード画像の読み込みと描画
+                // カード画像
                 const imagePath = path.join(__dirname, 'images', result.card.image);
                 if (fs.existsSync(imagePath)) {
-                    const img = await loadImage(imagePath); // 💡 Canvasの機能で画像をサクッと読み込むちゅ！
+                    const img = await loadImage(imagePath);
                     ctx.save();
-                    // 回転の基準点をカードの中心にするちゅ
                     ctx.translate(cx + cardWidth / 2, 140 + cardHeight / 2);
-                    if (result.isReversed) {
-                        ctx.rotate(Math.PI); // 180度回転
-                    }
+                    if (result.isReversed) ctx.rotate(Math.PI); 
                     ctx.drawImage(img, -cardWidth / 2, -cardHeight / 2, cardWidth, cardHeight);
                     ctx.restore();
                 } else {
@@ -997,38 +994,40 @@ client.on('interactionCreate', async (interaction) => {
                 // 正逆
                 ctx.font = '18px NotoSansJP';
                 ctx.fillStyle = result.isReversed ? '#FF6347' : '#e0e0e0';
-                ctx.fillText(result.isReversed ? '逆位置 🙃' : '正位置 ✨', centerX, 550);
+                ctx.fillText(result.isReversed ? '逆位置' : '正位置', centerX, 550); // 💡 絵文字を消したちゅ
             }
 
             // 解説エリアの背景
             ctx.fillStyle = '#2b2d31';
-            ctx.fillRect(40, 580, canvasWidth - 80, 280);
+            // 💡 枠の高さも 280から460 に大きく広げたちゅ！
+            ctx.fillRect(40, 580, canvasWidth - 80, 460);
             ctx.strokeStyle = '#444';
             ctx.lineWidth = 2;
-            ctx.strokeRect(40, 580, canvasWidth - 80, 280);
+            ctx.strokeRect(40, 580, canvasWidth - 80, 460);
 
             // 解説テキストの描画
             ctx.textAlign = 'left';
             ctx.font = 'bold 24px NotoSansJP';
             ctx.fillStyle = '#5865F2';
-            ctx.fillText(`📖 あなたの物語: ${storyResult.storyType}`, 60, 620);
+            ctx.fillText(`あなたの物語: ${stripEmoji(storyResult.storyType)}`, 60, 620);
 
             ctx.font = 'italic 18px NotoSansJP';
             ctx.fillStyle = '#e0e0e0';
-            // 💡 ここでさっき追加した「自動折り返し関数」が活躍するちゅ！
             let textY = drawCanvasText(ctx, storyResult.message, 60, 655, canvasWidth - 120, 26);
 
             textY += 20;
             ctx.font = 'bold 22px NotoSansJP';
             ctx.fillStyle = '#e0e0e0';
-            ctx.fillText('🐭 ねずみの統合リーディング', 60, textY);
+            ctx.fillText('ねずみの統合リーディング', 60, textY);
 
             textY += 35;
             ctx.font = '18px NotoSansJP';
             ctx.fillStyle = '#ffffff';
-            // 長すぎる場合はカット
-            const shortExp = finalExplanation.length > 350 ? finalExplanation.slice(0, 350) + '...' : finalExplanation;
-            drawCanvasText(ctx, shortExp, 60, textY, canvasWidth - 120, 26);
+            
+            // 💡 AIの文章が長すぎた場合はカットし、絵文字も安全に取り除くちゅ！
+            const shortExp = finalExplanation.length > 400 ? finalExplanation.slice(0, 400) + '...' : finalExplanation;
+            const safeExp = stripEmoji(shortExp);
+            drawCanvasText(ctx, safeExp, 60, textY, canvasWidth - 120, 26);
 
             // 日付
             ctx.textAlign = 'right';
@@ -1036,7 +1035,6 @@ client.on('interactionCreate', async (interaction) => {
             ctx.fillStyle = '#888';
             ctx.fillText(`今日（${getJSTInfo().displayDate}）の運命だちゅ！`, canvasWidth - 50, canvasHeight - 20);
 
-            // 💡 最後に完成したキャンバスをPNG画像に変換！
             const pngBuffer = await canvas.encode('png');
             const attachment = new AttachmentBuilder(pngBuffer, { name: 'tarot3_canvas.png' });
 
