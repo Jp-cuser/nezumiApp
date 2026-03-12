@@ -1820,50 +1820,174 @@ client.on('interactionCreate', async (interaction) => {
         }
     }
 
+    // 💡 【超・軽量爆速版】/rune コマンド (Canvasを使った1枚絵のルーン占い)
     else if (interaction.commandName === 'rune') {
         await interaction.deferReply({ ephemeral: isHidden });
+        await interaction.editReply({ content: '🌌 石に刻まれた古代の文字を読み解いて、1枚の絵にしているちゅ…！🐭🎨' });
+
         const personalSeed = getPersonalDailyRandom(interaction.user.id, 777);
         const runeIndex = Math.floor(personalSeed * runeAlphabet.length);
         const selectedRune = runeAlphabet[runeIndex];
 
+        // 逆位置が存在しないルーン文字のリスト
         const noReverseRunes = ['ᛗ', 'ᚷ', 'ᚹ', 'ᚻ', 'ᚾ', 'ᛁ', 'ᛃ', 'ᛇ', 'ᛊ', 'ᛝ', 'ᛞ'];
         let isReversed = getPersonalDailyRandom(interaction.user.id, 888) < 0.5;
         if (noReverseRunes.includes(selectedRune.symbol)) isReversed = false;
 
-        const imagePath = path.join(__dirname, 'images', selectedRune.image);
+        const geminiPromise = getGeminiRuneReading(selectedRune.name, isReversed, interaction.user.username);
+
+        // 絵文字を取り除く魔法（Canvasの文字化け防止！）
+        const stripEmoji = (str) => str.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '').replace(/[\u2600-\u27BF]/g, '').trim();
 
         try {
-            if (!fs.existsSync(imagePath)) throw new Error(`FILE_NOT_FOUND: ${selectedRune.image}`);
-
-            const imageBuffer = await sharp(imagePath)
-                .resize(300, 300)
-                .rotate(isReversed ? 180 : 0)
-                .webp({ quality: 75 })
-                .toBuffer();
+            // 💡 1. ルーン画像を読み込み、アスペクト比を計算するちゅ！
+            const cardWidth = 250;
+            let drawHeight = 250; 
+            let img = null;
+            const imagePath = path.join(__dirname, 'images', selectedRune.image);
             
-            const attachment = new AttachmentBuilder(imageBuffer, { name: 'rune.webp' });
-            const geminiMessage = await getGeminiRuneReading(selectedRune.name, isReversed, interaction.user.username);
-
-            const embed = new EmbedBuilder()
-                .setColor(0x8B4513)
-                .setTitle(`ᚱ 今日のルーン：${selectedRune.symbol} ${selectedRune.name}`)
-                .setImage('attachment://rune.webp')
-                .addFields(
-                    { name: '象徴', value: selectedRune.meaning, inline: true },
-                    { name: '向き', value: isReversed ? '逆位置 🙃' : '正位置 ✨', inline: true },
-                    { name: '石に刻まれた意味', value: isReversed ? selectedRune.reversed : selectedRune.upright },
-                    { name: 'ねずみのお告げ', value: geminiMessage }
-                )
-                .setFooter({ text: `${getJSTInfo().displayDate} の石の言葉だちゅ！` });
-
-            await interaction.editReply({ embeds: [embed], files: [attachment] });
-        } catch (error) {
-            console.error('Rune Command Error:', error);
-            if (error.message.includes('FILE_NOT_FOUND')) {
-                await interaction.editReply({ content: `画像（${selectedRune.image}）が images フォルダに見当たらないちゅ…。` });
-            } else {
-                await interaction.editReply({ content: 'ルーンを読み取ろうとしたけど、何かがおかしいちゅ…。ログを確認してちゅ！' });
+            if (fs.existsSync(imagePath)) {
+                img = await loadImage(imagePath);
+                const aspectRatio = img.width / img.height;
+                drawHeight = cardWidth / Math.max(0.1, aspectRatio);
             }
+
+            // AIの文章を待つちゅ
+            const geminiExplanation = await geminiPromise;
+            const finalExplanation = geminiExplanation || "石の言葉がうまく読み取れなかったちゅ…。";
+            
+            // 安全なテキストに変換
+            const safeSymbol = selectedRune.symbol; 
+            const safeMeaning = stripEmoji(selectedRune.meaning);
+            const safeStoneMeaning = stripEmoji(isReversed ? selectedRune.reversed : selectedRune.upright);
+            const safeExp = stripEmoji(finalExplanation);
+
+            // 💡 2. 文章の高さを測って、キャンバスの縦幅を決めるちゅ！
+            const dummyCanvas = createCanvas(1, 1);
+            const dummyCtx = dummyCanvas.getContext('2d');
+            const maxTextWidth = 600 - 120; 
+            
+            dummyCtx.font = '18px NotoSansJP';
+            const meaningHeight = measureTextHeight(dummyCtx, safeStoneMeaning, maxTextWidth, 26);
+            const expHeight = measureTextHeight(dummyCtx, safeExp, maxTextWidth, 26);
+
+            // 枠の中の文字の高さを全部足し算するちゅ
+            const symbolTitleHeight = 24 + 15 + 26; // 象徴タイトル + 余白 + 中身
+            const meaningSectionHeight = 24 + 15 + meaningHeight;
+            const expSectionHeight = 24 + 15 + expHeight;
+            
+            const boxContentHeight = symbolTitleHeight + 25 + meaningSectionHeight + 25 + expSectionHeight;
+            const boxPadding = 40;
+            const boxHeight = boxContentHeight + boxPadding * 2;
+
+            // レイアウトの基準位置（Y座標）
+            const cardAreaTop = 110;
+            const textYStart = cardAreaTop + drawHeight + 35;
+            const boxStartY = textYStart + 60; 
+            
+            const canvasWidth = 600; 
+            const canvasHeight = boxStartY + boxHeight + 50; 
+
+            // 💡 3. ピッタリサイズのキャンバスを作って描画スタート！
+            const canvas = createCanvas(canvasWidth, canvasHeight);
+            const ctx = canvas.getContext('2d');
+
+            // 背景と枠線（古代の石板をイメージしたブラウン系）
+            ctx.fillStyle = '#1e1e24';
+            ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+            ctx.strokeStyle = '#8B4513'; 
+            ctx.lineWidth = 10;
+            ctx.strokeRect(0, 0, canvasWidth, canvasHeight);
+
+            // タイトル
+            ctx.textAlign = 'center';
+            ctx.font = 'bold 32px NotoSansJP';
+            ctx.fillStyle = '#FFD700'; 
+            ctx.fillText(`今日のルーン：${safeSymbol} ${selectedRune.name}`, canvasWidth / 2, 60);
+
+            // 💡 石の画像の描画
+            const centerX = canvasWidth / 2;
+            if (img) {
+                ctx.save();
+                ctx.translate(centerX, cardAreaTop + drawHeight / 2);
+                if (isReversed) ctx.rotate(Math.PI);
+                ctx.drawImage(img, -cardWidth / 2, -drawHeight / 2, cardWidth, drawHeight);
+                ctx.restore();
+            } else {
+                ctx.fillStyle = '#333';
+                ctx.fillRect(centerX - cardWidth / 2, cardAreaTop, cardWidth, drawHeight);
+                ctx.fillStyle = '#fff';
+                ctx.font = '16px NotoSansJP';
+                ctx.fillText('画像なし', centerX, cardAreaTop + drawHeight / 2);
+            }
+
+            // ルーン名と正逆
+            ctx.font = 'bold 24px NotoSansJP';
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText(selectedRune.name, centerX, textYStart);
+
+            ctx.font = '20px NotoSansJP';
+            ctx.fillStyle = isReversed ? '#FF6347' : '#e0e0e0';
+            ctx.fillText(isReversed ? '逆位置' : '正位置', centerX, textYStart + 30);
+
+            // 💡 解説エリアの背景
+            ctx.fillStyle = '#2b2d31';
+            ctx.fillRect(40, boxStartY, canvasWidth - 80, boxHeight);
+            ctx.strokeStyle = '#8B4513';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(40, boxStartY, canvasWidth - 80, boxHeight);
+
+            // 💡 解説テキストの描画
+            let textY = boxStartY + 45; 
+            const textX = 60;
+
+            // ① 象徴
+            ctx.textAlign = 'left';
+            ctx.font = 'bold 22px NotoSansJP';
+            ctx.fillStyle = '#D2691E'; // チョコレートのような濃いオレンジ
+            ctx.fillText('象徴', textX, textY);
+            textY += 30;
+            ctx.font = '18px NotoSansJP';
+            ctx.fillStyle = '#e0e0e0';
+            ctx.fillText(safeMeaning, textX, textY);
+            
+            textY += 35; 
+            
+            // ② 石に刻まれた意味
+            ctx.font = 'bold 22px NotoSansJP';
+            ctx.fillStyle = '#D2691E';
+            ctx.fillText('石に刻まれた意味', textX, textY);
+            textY += 30;
+            ctx.font = '18px NotoSansJP';
+            ctx.fillStyle = '#e0e0e0';
+            textY = drawCanvasText(ctx, safeStoneMeaning, textX, textY, maxTextWidth, 26);
+
+            textY += 25;
+
+            // ③ ねずみのお告げ (Gemini)
+            ctx.font = 'bold 22px NotoSansJP';
+            ctx.fillStyle = '#FFD700';
+            ctx.fillText('ねずみのお告げ', textX, textY);
+            textY += 30;
+            ctx.font = '18px NotoSansJP';
+            ctx.fillStyle = '#ffffff';
+            drawCanvasText(ctx, safeExp, textX, textY, maxTextWidth, 26);
+
+            // 日付
+            ctx.textAlign = 'right';
+            ctx.font = '16px NotoSansJP';
+            ctx.fillStyle = '#888';
+            ctx.fillText(`${getJSTInfo().displayDate} の石の言葉だちゅ！`, canvasWidth - 50, canvasHeight - 20);
+
+            // 💡 PNG画像に変換して送信！
+            const pngBuffer = await canvas.encode('png');
+            const attachment = new AttachmentBuilder(pngBuffer, { name: 'rune_canvas.png' });
+
+            await interaction.editReply({ content: 'お待たせしたちゅ！今日のあなたへの石の言葉だちゅ！✨', embeds: [], files: [attachment] });
+
+        } catch (error) {
+            console.error('Canvasルーン占いエラー:', error);
+            await interaction.editReply({ content: '石の言葉を読み取る途中でつまづいちゃったちゅ…。ログを確認してちゅ💦' });
         }
     }
 
