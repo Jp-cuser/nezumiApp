@@ -2672,121 +2672,132 @@ client.on('interactionCreate', async (interaction) => {
         }
         }
 
-        // 🍣 寿司の注文 (btn_sushi_order)
-        // 💡 【超・軽量爆速版】プルダウンで注文した時の処理 (Canvasでお寿司の提供！)
-    // 💡 【超・軽量爆速版】プルダウンで注文した時の処理 (Canvasでお寿司の提供！)
-    else if (interaction.isStringSelectMenu() && interaction.customId === 'sushi_select_order') {
-        await interaction.deferUpdate(); 
+    // 🍣 寿司の注文 (btn_sushi_order)
+        // 💡 【追加】ボタンを押した時に、お寿司のリストを表示する処理だちゅ！
+        else if (interaction.customId === 'btn_sushi_order') {
+            const sushiOptions = sushiMenu.map((item, index) => ({
+                label: `${item.name} (${item.price}円)`,
+                description: item.description,
+                value: index.toString(),
+                emoji: '🍣'
+            }));
 
-        // 💡 修正：メニューを消しつつ、ローディングメッセージで確実に上書きするちゅ！
-        try { await interaction.editReply({ content: '🍣 大将が心を込めて握っているちゅ…お待ちを！', components: [] }); } catch(e) {}
+            const row = new ActionRowBuilder().addComponents(
+                new StringSelectMenuBuilder()
+                    .setCustomId('sushi_select_order')
+                    .setPlaceholder('どのネタを握るちゅ？🍣')
+                    .addOptions(sushiOptions)
+            );
 
-        const selectedIndex = parseInt(interaction.values[0], 10);
-        const selectedSushi = sushiMenu[selectedIndex];
-
-        // 絵文字を取り除く魔法（文字化け防止）
-        const stripEmoji = (str) => str.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '').replace(/[\u2600-\u27BF]/g, '').trim();
-
-        try {
-            const imagePath = path.join(__dirname, 'images', selectedSushi.image);
-            const canvasWidth = 600;
-            const contentWidth = 500;
-            let drawHeight = 300;
-            let img = null;
-
-            if (fs.existsSync(imagePath)) {
-                img = await loadImage(imagePath);
-                const aspectRatio = img.width / img.height;
-                drawHeight = contentWidth / Math.max(0.1, aspectRatio);
-            }
-
-            const safeName = stripEmoji(selectedSushi.name);
-            const safeDesc = stripEmoji(selectedSushi.description);
-
-            // 💡 1. 説明文の高さを測るちゅ
-            const dummyCanvas = createCanvas(1, 1);
-            const dummyCtx = dummyCanvas.getContext('2d');
-            dummyCtx.font = '22px NotoSansJP';
-            const descHeight = measureTextHeight(dummyCtx, safeDesc, contentWidth - 40, 32);
-
-            const headerHeight = 100;
-            const textYStart = headerHeight + drawHeight + 30;
-            const boxHeight = 50 + descHeight + 40; // ネタ名・値段エリア + 説明文エリア + 余白
-            const canvasHeight = textYStart + boxHeight + 40;
-
-            // 💡 2. お寿司提供用キャンバスを作る！
-            const canvas = createCanvas(canvasWidth, canvasHeight);
-            const ctx = canvas.getContext('2d');
-
-            // 背景と枠線 (和風の漆器やお皿をイメージしたカラー)
-            ctx.fillStyle = '#1e1e24';
-            ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-            ctx.strokeStyle = '#00FA9A'; // 新鮮さを表すグリーン
-            ctx.lineWidth = 10;
-            ctx.strokeRect(0, 0, canvasWidth, canvasHeight);
-
-            // タイトル
-            ctx.textAlign = 'center';
-            ctx.font = 'bold 36px NotoSansJP';
-            ctx.fillStyle = '#ffffff';
-            ctx.fillText('へいお待ち！', canvasWidth / 2, 60);
-
-            // 💡 お寿司画像の描画
-            const imgX = (canvasWidth - contentWidth) / 2;
-            const imgY = headerHeight;
-            if (img) {
-                ctx.drawImage(img, imgX, imgY, contentWidth, drawHeight);
-                ctx.strokeStyle = '#ffffff';
-                ctx.lineWidth = 4;
-                ctx.strokeRect(imgX, imgY, contentWidth, drawHeight);
-            } else {
-                ctx.fillStyle = '#333';
-                ctx.fillRect(imgX, imgY, contentWidth, drawHeight);
-                ctx.fillStyle = '#fff';
-                ctx.fillText('画像なし', canvasWidth / 2, imgY + drawHeight / 2);
-            }
-
-            // 💡 お寿司の情報枠
-            ctx.fillStyle = '#2b2d31';
-            ctx.fillRect(imgX, textYStart, contentWidth, boxHeight);
-            ctx.strokeStyle = '#00FA9A';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(imgX, textYStart, contentWidth, boxHeight);
-
-            // ネタの名前と値段
-            ctx.textAlign = 'left';
-            ctx.font = 'bold 28px NotoSansJP';
-            ctx.fillStyle = '#FFD700';
-            ctx.fillText(safeName, imgX + 20, textYStart + 40);
-
-            ctx.textAlign = 'right';
-            ctx.font = 'bold 24px NotoSansJP';
-            ctx.fillStyle = '#ff6b6b';
-            ctx.fillText(`${selectedSushi.price}円`, imgX + contentWidth - 20, textYStart + 40);
-
-            // ネタの説明
-            ctx.textAlign = 'left';
-            ctx.font = '22px NotoSansJP';
-            ctx.fillStyle = '#e0e0e0';
-            drawCanvasText(ctx, safeDesc, imgX + 20, textYStart + 80, contentWidth - 40, 32);
-
-            // PNGに変換して送信！
-            const pngBuffer = await canvas.encode('png');
-            const attachment = new AttachmentBuilder(pngBuffer, { name: 'sushi_canvas.png' });
-
-            // 💡 修正：followUp ではなく editReply で元のメッセージごと画像を上書きするちゅ！
             await interaction.editReply({ 
-                content: `✨ 握りたての **${safeName}** だちゅ！`, 
-                embeds: [], 
-                components: [], // 完全にメニューを消す！
-                files: [attachment]
+                content: 'へいらっしゃい！新鮮なネタが揃ってるちゅ！注文を選んでね！', 
+                components: [row] 
             });
-
-        } catch (error) {
-            console.error('Canvas寿司提供エラー:', error);
-            await interaction.editReply({ content: 'お寿司を落としちゃったちゅ…', components: [] });
         }
-    }
+
+        // 💡 【超・軽量爆速版】プルダウンで注文した時の処理 (Canvasでお寿司の提供！)
+        else if (interaction.isStringSelectMenu() && interaction.customId === 'sushi_select_order') {
+            await interaction.deferUpdate(); 
+
+            // 💡 メニューを消しつつ、ローディングメッセージで確実に上書きするちゅ！
+            try { await interaction.editReply({ content: '🍣 大将が心を込めて握っているちゅ…お待ちを！', components: [] }); } catch(e) {}
+
+            const selectedIndex = parseInt(interaction.values[0], 10);
+            const selectedSushi = sushiMenu[selectedIndex];
+
+            const stripEmoji = (str) => str.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '').replace(/[\u2600-\u27BF]/g, '').trim();
+
+            try {
+                const imagePath = path.join(__dirname, 'images', selectedSushi.image);
+                const canvasWidth = 600;
+                const contentWidth = 500;
+                let drawHeight = 300;
+                let img = null;
+
+                if (fs.existsSync(imagePath)) {
+                    img = await loadImage(imagePath);
+                    const aspectRatio = img.width / img.height;
+                    drawHeight = contentWidth / Math.max(0.1, aspectRatio);
+                }
+
+                const safeName = stripEmoji(selectedSushi.name);
+                const safeDesc = stripEmoji(selectedSushi.description);
+
+                const dummyCanvas = createCanvas(1, 1);
+                const dummyCtx = dummyCanvas.getContext('2d');
+                dummyCtx.font = '22px NotoSansJP';
+                const descHeight = measureTextHeight(dummyCtx, safeDesc, contentWidth - 40, 32);
+
+                const headerHeight = 100;
+                const textYStart = headerHeight + drawHeight + 30;
+                const boxHeight = 50 + descHeight + 40; 
+                const canvasHeight = textYStart + boxHeight + 40;
+
+                const canvas = createCanvas(canvasWidth, canvasHeight);
+                const ctx = canvas.getContext('2d');
+
+                // 背景と枠線
+                ctx.fillStyle = '#1e1e24';
+                ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+                ctx.strokeStyle = '#00FA9A'; 
+                ctx.lineWidth = 10;
+                ctx.strokeRect(0, 0, canvasWidth, canvasHeight);
+
+                ctx.textAlign = 'center';
+                ctx.font = 'bold 36px NotoSansJP';
+                ctx.fillStyle = '#ffffff';
+                ctx.fillText('へいお待ち！', canvasWidth / 2, 60);
+
+                const imgX = (canvasWidth - contentWidth) / 2;
+                const imgY = headerHeight;
+                if (img) {
+                    ctx.drawImage(img, imgX, imgY, contentWidth, drawHeight);
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 4;
+                    ctx.strokeRect(imgX, imgY, contentWidth, drawHeight);
+                } else {
+                    ctx.fillStyle = '#333';
+                    ctx.fillRect(imgX, imgY, contentWidth, drawHeight);
+                    ctx.fillStyle = '#fff';
+                    ctx.fillText('画像なし', canvasWidth / 2, imgY + drawHeight / 2);
+                }
+
+                ctx.fillStyle = '#2b2d31';
+                ctx.fillRect(imgX, textYStart, contentWidth, boxHeight);
+                ctx.strokeStyle = '#00FA9A';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(imgX, textYStart, contentWidth, boxHeight);
+
+                ctx.textAlign = 'left';
+                ctx.font = 'bold 28px NotoSansJP';
+                ctx.fillStyle = '#FFD700';
+                ctx.fillText(safeName, imgX + 20, textYStart + 40);
+
+                ctx.textAlign = 'right';
+                ctx.font = 'bold 24px NotoSansJP';
+                ctx.fillStyle = '#ff6b6b';
+                ctx.fillText(`${selectedSushi.price}円`, imgX + contentWidth - 20, textYStart + 40);
+
+                ctx.textAlign = 'left';
+                ctx.font = '22px NotoSansJP';
+                ctx.fillStyle = '#e0e0e0';
+                drawCanvasText(ctx, safeDesc, imgX + 20, textYStart + 80, contentWidth - 40, 32);
+
+                const pngBuffer = await canvas.encode('png');
+                const attachment = new AttachmentBuilder(pngBuffer, { name: 'sushi_canvas.png' });
+
+                await interaction.editReply({ 
+                    content: `✨ 握りたての **${safeName}** だちゅ！`, 
+                    embeds: [], 
+                    components: [], // 完全にメニューを消す！
+                    files: [attachment]
+                });
+
+            } catch (error) {
+                console.error('Canvas寿司提供エラー:', error);
+                await interaction.editReply({ content: 'お寿司を落としちゃったちゅ…', components: [] });
+            }
+        }
 
         // 💰 おあいそクイズ (btn_sushi_oaiso)
         else if (interaction.customId === 'btn_sushi_oaiso') {
@@ -3470,60 +3481,7 @@ client.on('interactionCreate', async (interaction) => {
             await interaction.followUp({ content: 'お寿司を落としちゃったちゅ…', ephemeral: isHidden });
         }
     }
-    // 💡 【超・軽量爆速版】注文追加時の処理 (注文した寿司の画像！)
-    // 💡 【超・軽量爆速版】注文追加時の処理 (画像を差し替えてメニューを復活させる！)
-    else if (interaction.isStringSelectMenu() && interaction.customId === 'oaiso_add_item') {
-        await interaction.deferUpdate(); // 💡 これを使うと元のメッセージを上書きできるちゅ！
-        const userId = interaction.user.id;
-        const game = oaisoGames.get(userId);
-
-        if (!game) return interaction.followUp({ content: 'ゲーム情報が見つからないちゅ。もう一度 `/sushi_oaiso` を打ってちゅ！', ephemeral: true });
-
-        const selectedIndex = parseInt(interaction.values[0], 10);
-        const selectedSushi = sushiMenu[selectedIndex];
-
-        game.currentTotal += selectedSushi.price;
-        game.orderedItems.push(selectedSushi.name);
-
-        try {
-            const extraMsg = `へいお待ち！ ${selectedSushi.name} を追加したちゅ。`;
-            const pngBuffer = await generateOaisoCanvas(game, 'playing', extraMsg, selectedSushi.image);
-            const attachment = new AttachmentBuilder(pngBuffer, { name: 'oaiso_update.png' });
-
-            // 💡 修正：ここでメニューとボタンを「もう一度作り直す」ちゅ！
-            // これでDiscordの「選択済み」状態がリセットされて、同じお寿司も連続で頼めるようになるちゅ！
-            const sushiOptions = sushiMenu.map((item, index) => ({
-                label: `${item.name}`,
-                value: index.toString(),
-                emoji: '🍣'
-            }));
-
-            const selectRow = new ActionRowBuilder().addComponents(
-                new StringSelectMenuBuilder()
-                    .setCustomId('oaiso_add_item')
-                    .setPlaceholder('どんどん注文するちゅ！(何個でもOK)')
-                    .addOptions(sushiOptions)
-            );
-
-            const buttonRow = new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setCustomId('oaiso_bill_please')
-                    .setLabel('おあいそ！（会計）💰')
-                    .setStyle(ButtonStyle.Success)
-            );
-
-            // 💡 修正：followUpではなく「editReply」を使うと、同じ場所で画像とメニューが切り替わるちゅ！
-            await interaction.editReply({ 
-                content: `🍣 ${selectedSushi.name} を握ったちゅ！次はどうするちゅ？`, 
-                embeds: [], 
-                files: [attachment], 
-                components: [selectRow, buttonRow] // メニューを再セット！
-            });
-        } catch (e) {
-            console.error('注文追加エラー:', e);
-            await interaction.followUp({ content: '注文が通らなかったちゅ…', ephemeral: true });
-        }
-    }
+    
 
     // 💡 【超・軽量爆速版】おあいそボタンを押した時の結果発表 (メニューを消して結果を表示！)
     else if (interaction.isButton() && interaction.customId === 'oaiso_bill_please') {
