@@ -1421,8 +1421,9 @@ client.on('interactionCreate', async (interaction) => {
     // 💡 Modal(ポップアップ)やUserSelectMenuの判定も追加するちゅ！
     if (!interaction.isChatInputCommand() && !interaction.isStringSelectMenu() && !interaction.isButton() && !interaction.isModalSubmit() && !interaction.isUserSelectMenu()) return;
 
-    const isHidden = interaction.guildId !== '1480458980655366188';
-    const flags = isHidden ? MessageFlags.Ephemeral : undefined;
+    // 💡 【修正】サーバーの制限を解除！どこでもみんなに見えるようにしたちゅ！
+    const isHidden = false;
+    const flags = undefined;
 
     // ==========================================================
     // 🚪 1. 入り口： /nezumi コマンド
@@ -1499,7 +1500,7 @@ client.on('interactionCreate', async (interaction) => {
     // ==========================================================
     else if (interaction.isButton() && (interaction.customId === 'btn_weather' || interaction.customId === 'btn_hitandblow')) {
         // ※モーダルを開く時は deferUpdate() をしちゃダメだちゅ！
-        const { ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js'); // 必要なら一番上に追記してちゅ
+        const { ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js'); 
         
         if (interaction.customId === 'btn_weather') {
             const modal = new ModalBuilder().setCustomId('modal_weather').setTitle('一週間天気予報');
@@ -1510,7 +1511,11 @@ client.on('interactionCreate', async (interaction) => {
                 .setStyle(TextInputStyle.Short)
                 .setRequired(true);
             modal.addComponents(new ActionRowBuilder().addComponents(input));
+            
             await interaction.showModal(modal);
+            // 💡 【追加】モーダルを開いた直後、元のメッセージのボタンを消すちゅ！
+            try { await interaction.message.edit({ components: [] }); } catch(e) {}
+            
         } else if (interaction.customId === 'btn_hitandblow') {
             const modal = new ModalBuilder().setCustomId('modal_hitandblow').setTitle('ヒット＆ブロー');
             const input = new TextInputBuilder()
@@ -1521,7 +1526,10 @@ client.on('interactionCreate', async (interaction) => {
                 .setMinLength(4).setMaxLength(4)
                 .setRequired(true);
             modal.addComponents(new ActionRowBuilder().addComponents(input));
+            
             await interaction.showModal(modal);
+            // 💡 【追加】モーダルを開いた直後、元のメッセージのボタンを消すちゅ！
+            try { await interaction.message.edit({ components: [] }); } catch(e) {}
         }
     }
 
@@ -1565,12 +1573,18 @@ client.on('interactionCreate', async (interaction) => {
             
             // 例外処理：おあいそゲームの中のボタン・メニューは deferUpdate 済みなのでスキップ
             if (interaction.customId !== 'sushi_select_order' && interaction.customId !== 'oaiso_add_item' && interaction.customId !== 'oaiso_bill_please' && !interaction.customId.startsWith('btn_atk') && !interaction.customId.startsWith('btn_def') && !interaction.customId.startsWith('btn_sp') && !interaction.customId.startsWith('btn_special') && interaction.customId !== 'catch_attempt' && interaction.customId !== 'catch_ignore' && interaction.customId !== 'kibun_select_channel') {
-                try { await interaction.deferUpdate(); } catch(e) {} 
+                try { 
+                    await interaction.deferUpdate(); 
+                    
+                    // 💡 【追加】二度押し防止！ボタンやメニューを押した瞬間に、元のボタンを空にして消すちゅ！
+                    // （※モーダル送信時は components を消すとエラーになることがあるので除外するちゅ）
+                    if (!interaction.isModalSubmit()) {
+                        await interaction.editReply({ components: [] });
+                    }
+                } catch(e) {} 
             }
-        } else {
-            return; // Kibunなどのスラッシュコマンドは下に抜ける
-        }
-
+        } 
+        
         // 🔮 タロット (btn_tarot)
         if (interaction.customId === 'btn_tarot') {
             await interaction.editReply({ content: '🌌 星の導きを読み解きながら、今日の1枚を描いているちゅ…！🐭🎨' });
