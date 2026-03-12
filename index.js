@@ -1621,16 +1621,16 @@ client.on('interactionCreate', async (interaction) => {
             // 例外処理：おあいそゲームの中のボタン・メニューは deferUpdate 済みなのでスキップ
             if (interaction.customId !== 'sushi_select_order' && interaction.customId !== 'oaiso_add_item' && interaction.customId !== 'oaiso_bill_please' && !interaction.customId.startsWith('btn_atk') && !interaction.customId.startsWith('btn_def') && !interaction.customId.startsWith('btn_sp') && !interaction.customId.startsWith('btn_special') && interaction.customId !== 'catch_attempt' && interaction.customId !== 'catch_ignore' && interaction.customId !== 'kibun_select_channel') {
                 try { 
-                    await interaction.deferUpdate(); 
-                    
-                    // 💡 【追加】二度押し防止！ボタンやメニューを押した瞬間に、元のボタンを空にして消すちゅ！
-                    // （※モーダル送信時は components を消すとエラーになることがあるので除外するちゅ）
-                    if (!interaction.isModalSubmit()) {
+                    // 💡 【超重要】フォーム(モーダル)送信の時は、新しいメッセージを作る「deferReply」を使うちゅ！
+                    if (interaction.isModalSubmit()) {
+                        await interaction.deferReply();
+                    } else {
+                        await interaction.deferUpdate(); 
                         await interaction.editReply({ components: [] });
                     }
                 } catch(e) {} 
             }
-        } 
+        }
         
         // 🔮 タロット (btn_tarot)
         if (interaction.customId === 'btn_tarot') {
@@ -2342,17 +2342,18 @@ client.on('interactionCreate', async (interaction) => {
         }
 
         // 🌤️ 天気予報 (モーダルの送信)
+        // 🌤️ 天気予報 (モーダルの送信)
         else if (interaction.isModalSubmit() && interaction.customId === 'modal_weather') {
             // モーダルから入力された都道府県を取得！
             const pref = interaction.fields.getTextInputValue('input_prefecture');
             await interaction.editReply({ content: '🌤️ 空模様を調べて、1枚の天気図を描いているちゅ…！🐭🎨' });
 
-        const target = prefCoords[pref.replace(/都|道|府|県/g, '')]; 
+            // 💡 修正：「北海道」の「道」が消えないように、末尾の「都・府・県」だけを消す魔法だちゅ！
+            const target = prefCoords[pref.replace(/(都|府|県)$/, '')]; 
 
-        if (!target) {
-            return interaction.editReply({ content: 'その都道府県の座標データが見つからなかったちゅ…。' });
-        }
-
+            if (!target) {
+                return interaction.editReply({ content: 'その都道府県のデータが見つからなかったちゅ…。漢字で正しく入力してちゅ！（例：東京、北海道、京都）' });
+            }
         try {
             const url = `https://api.open-meteo.com/v1/forecast?latitude=${target.lat}&longitude=${target.lon}&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=Asia%2FTokyo`;
             const response = await axios.get(url);
