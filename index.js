@@ -735,6 +735,7 @@ const generateOaisoCanvas = async (game, state, extraMsg, displayImageName) => {
     };
 //**************************************************************************************目指せネズミマスター******************************************************************************************** */
 const petDataFile = path.join(__dirname, 'pets.json');
+const petCatches = new Map();
 
 // 🌟 箱を作る宣言を【絶対に一番上】に書くちゅ！
 let userPets = {}; 
@@ -2578,27 +2579,31 @@ client.on('interactionCreate', async (interaction) => {
         }
     }
 
+    // 💡 【超・軽量爆速版】/pet_catch コマンド (絶対に考え中で止まらない安全版)
     else if (interaction.commandName === 'pet_catch') {
-        await interaction.deferReply({ ephemeral: isHidden });
-
-        // 全部の動物リストからランダムに1匹選ぶちゅ！
-        const allPets = [...extraImages.mouse, ...extraImages.rat, ...extraImages.not_mouse];
-        const targetPet = allPets[Math.floor(Math.random() * allPets.length)];
-        
-        petCatches.set(interaction.user.id, targetPet);
-
-        const buttonRow = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId('catch_attempt')
-                .setLabel('捕まえる！🐭')
-                .setStyle(ButtonStyle.Success),
-            new ButtonBuilder()
-                .setCustomId('catch_ignore')
-                .setLabel('見逃す💨')
-                .setStyle(ButtonStyle.Secondary)
-        );
+        // 💡 警告が出ない新しい書き方だちゅ！
+        const flags = (typeof isHidden !== 'undefined' && isHidden) ? MessageFlags.Ephemeral : undefined;
+        await interaction.deferReply({ flags });
 
         try {
+            // 💡 エラーが起きやすい部分を、すべて安全装置（try）の中に入れたちゅ！
+            const allPets = [...extraImages.mouse, ...extraImages.rat, ...extraImages.not_mouse];
+            const targetPet = allPets[Math.floor(Math.random() * allPets.length)];
+            
+            // プレイヤーがどの動物に遭遇したか記憶するちゅ
+            petCatches.set(interaction.user.id, targetPet);
+
+            const buttonRow = new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setCustomId('catch_attempt')
+                    .setLabel('捕まえる！🐭')
+                    .setStyle(ButtonStyle.Success),
+                new ButtonBuilder()
+                    .setCustomId('catch_ignore')
+                    .setLabel('見逃す💨')
+                    .setStyle(ButtonStyle.Secondary)
+            );
+
             const extraMsg = `野生の「${targetPet.name}」が現れたちゅ！\nそーっと近づいて、下のボタンで捕まえるちゅ！`;
             const pngBuffer = await generatePetCatchCanvas(targetPet, 'appear', extraMsg);
             const attachment = new AttachmentBuilder(pngBuffer, { name: 'pet_appear.png' });
@@ -2611,17 +2616,23 @@ client.on('interactionCreate', async (interaction) => {
             });
         } catch (e) {
             console.error('ペット出現エラー:', e);
-            await interaction.editReply({ content: '草むらに逃げられちゃったちゅ…' });
+            // 💡 万が一エラーが起きても、ここで必ず「考え中」を解除するちゅ！
+            await interaction.editReply({ content: '草むらに逃げられちゃったちゅ…（※黒い画面のエラーログを見てちゅ！）' });
         }
     }
 
-    // 💡 【超・軽量爆速版】捕まえるボタンを押した時の処理 (結果発表！)
+    // 💡 【超・軽量爆速版】捕まえるボタンを押した時の処理 (警告対策版)
     else if (interaction.isButton() && (interaction.customId === 'catch_attempt' || interaction.customId === 'catch_ignore')) {
         await interaction.deferUpdate();
         const userId = interaction.user.id;
         const targetPet = petCatches.get(userId);
 
-        if (!targetPet) return interaction.followUp({ content: 'もうその子はどこかに行っちゃったみたいだちゅ。', ephemeral: true });
+        if (!targetPet) {
+            return interaction.followUp({ 
+                content: 'もうその子はどこかに行っちゃったみたいだちゅ。', 
+                flags: MessageFlags.Ephemeral 
+            });
+        }
 
         // 見逃すボタンを押した場合
         if (interaction.customId === 'catch_ignore') {
@@ -2658,7 +2669,10 @@ client.on('interactionCreate', async (interaction) => {
             });
         } catch (e) {
             console.error('ペット捕獲結果エラー:', e);
-            await interaction.followUp({ content: 'モンスターボールが壊れちゃったちゅ…', ephemeral: true });
+            await interaction.followUp({ 
+                content: 'モンスターボールが壊れちゃったちゅ…', 
+                flags: MessageFlags.Ephemeral 
+            });
         }
     }
     else if (interaction.commandName === 'pet_status') {
