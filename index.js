@@ -18,7 +18,7 @@ require('dotenv').config();
 const satori = require('satori').default;
 const { Resvg } = require('@resvg/resvg-js');
 const React = require('react');
-
+const { html } = require('satori-html');
 // 💡 【追加】フォントファイルを読み込む
 const fontPath = path.join(__dirname, 'fonts', 'akabara-cinderella.ttf'); // さっき置いたフォントファイル名に合わせてちゅ！
 let fontData;
@@ -919,99 +919,54 @@ client.on('interactionCreate', async (interaction) => {
 
         // 5. 🎙️ satoriを使って画像をデザインするちゅ！
         // 💡 React.createElementを使わずに、satoriが絶対にエラーを起こさない「生のデータ形式」で書き直したちゅ！
-        const element = {
-            type: 'div',
-            props: {
-                style: {
-                    display: 'flex', flexDirection: 'column', alignItems: 'center',
-                    width: '1200px', height: '1000px',
-                    backgroundColor: '#1a1a1a', color: '#e0e0e0',
-                    fontFamily: 'NotoSansJP',
-                    padding: '40px', boxSizing: 'border-box',
-                    borderRadius: '20px', border: '4px solid #5865F2'
-                },
-                children: [
-                    // タイトル
-                    {
-                        type: 'div',
-                        props: {
-                            style: { fontSize: '48px', fontWeight: 'bold', marginBottom: '30px', color: '#FFD700' },
-                            children: `✨ ${interaction.user.username}さんの運命の3枚引き ✨`
-                        }
-                    },
-                    // カードエリア（横並び）
-                    {
-                        type: 'div',
-                        props: {
-                            style: { display: 'flex', justifyContent: 'space-around', width: '100%', marginBottom: '40px' },
-                            children: drawnResults.map((result, i) => ({
-                                type: 'div',
-                                props: {
-                                    style: { display: 'flex', flexDirection: 'column', alignItems: 'center', width: '300px' },
-                                    children: [
-                                        {
-                                            type: 'div',
-                                            props: { style: { fontSize: '28px', marginBottom: '10px', color: '#00FA9A' }, children: result.position }
-                                        },
-                                        cardImages[i] ? {
-                                            type: 'img',
-                                            props: { src: cardImages[i], style: { width: '250px', height: '430px', borderRadius: '10px', marginBottom: '10px' } }
-                                        } : {
-                                            type: 'div',
-                                            props: { style: { width: '250px', height: '430px', backgroundColor: '#333', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }, children: '画像なし' }
-                                        },
-                                        {
-                                            type: 'div',
-                                            props: { style: { fontSize: '22px', fontWeight: 'bold' }, children: result.card.name }
-                                        },
-                                        {
-                                            type: 'div',
-                                            props: { style: { fontSize: '18px', color: result.isReversed ? '#FF6347' : '#e0e0e0' }, children: result.isReversed ? '逆位置 🙃' : '正位置 ✨' }
-                                        }
-                                    ]
-                                }
-                            }))
-                        }
-                    },
-                    // 解説エリア
-                    {
-                        type: 'div',
-                        props: {
-                            style: { display: 'flex', flexDirection: 'column', width: '100%', backgroundColor: '#2a2a2a', padding: '30px', borderRadius: '15px', border: '1px solid #444' },
-                            children: [
-                                {
-                                    type: 'div',
-                                    props: { style: { fontSize: '32px', fontWeight: 'bold', color: '#5865F2', marginBottom: '15px' }, children: `📖 あなたの物語: ${storyResult.storyType}` }
-                                },
-                                {
-                                    type: 'div',
-                                    props: { style: { fontSize: '22px', fontStyle: 'italic', marginBottom: '25px', lineHeight: 1.4 }, children: storyResult.message }
-                                },
-                                {
-                                    type: 'div',
-                                    props: { style: { fontSize: '28px', fontWeight: 'bold', color: '#e0e0e0', marginBottom: '10px' }, children: '🐭 ねずみの統合リーディング' }
-                                },
-                                {
-                                    type: 'div',
-                                    props: { style: { fontSize: '20px', lineHeight: 1.6 }, children: shortExplanation }
-                                }
-                            ]
-                        }
-                    },
-                    // フッター
-                    {
-                        type: 'div',
-                        props: {
-                            style: { position: 'absolute', bottom: '20px', right: '30px', fontSize: '18px', color: '#888' },
-                            children: `今日（${getJSTInfo().displayDate}）の運命だちゅ！`
-                        }
-                    }
-                ]
-            }
-        };
+        const markup = html`
+            <div style="display: flex; flex-direction: column; align-items: center; width: 1200px; height: 1000px; background-color: #1a1a1a; color: #e0e0e0; font-family: NotoSansJP; padding: 40px; box-sizing: border-box; border-radius: 20px; border: 4px solid #5865F2;">
+                
+                <div style="font-size: 48px; font-weight: bold; margin-bottom: 30px; color: #FFD700;">
+                    ✨ ${interaction.user.username}さんの運命の3枚引き ✨
+                </div>
+
+                <div style="display: flex; justify-content: space-around; width: 100%; margin-bottom: 40px;">
+                    ${drawnResults.map((result, i) => `
+                        <div style="display: flex; flex-direction: column; align-items: center; width: 300px;">
+                            <div style="font-size: 28px; margin-bottom: 10px; color: #00FA9A;">${result.position}</div>
+                            
+                            ${cardImages[i] 
+                                ? `<img src="${cardImages[i]}" style="width: 250px; height: 430px; border-radius: 10px; margin-bottom: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.5);" />` 
+                                : `<div style="width: 250px; height: 430px; background-color: #333; border-radius: 10px; margin-bottom: 10px; display: flex; align-items: center; justify-content: center;">画像なし</div>`
+                            }
+                            
+                            <div style="font-size: 22px; font-weight: bold;">${result.card.name}</div>
+                            <div style="font-size: 18px; color: ${result.isReversed ? '#FF6347' : '#e0e0e0'};">
+                                ${result.isReversed ? '逆位置 🙃' : '正位置 ✨'}
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+
+                <div style="display: flex; flex-direction: column; width: 100%; background-color: #2a2a2a; padding: 30px; border-radius: 15px; border: 1px solid #444;">
+                    <div style="font-size: 32px; font-weight: bold; color: #5865F2; margin-bottom: 15px;">
+                        📖 あなたの物語: ${storyResult.storyType}
+                    </div>
+                    <div style="font-size: 22px; font-style: italic; margin-bottom: 25px; line-height: 1.4;">
+                        ${storyResult.message}
+                    </div>
+                    <div style="font-size: 28px; font-weight: bold; color: #e0e0e0; margin-bottom: 10px;">
+                        🐭 ねずみの統合リーディング
+                    </div>
+                    <div style="font-size: 20px; line-height: 1.6;">
+                        ${shortExplanation}
+                    </div>
+                </div>
+
+                <div style="position: absolute; bottom: 20px; right: 30px; font-size: 18px; color: #888;">
+                    今日（${getJSTInfo().displayDate}）の運命だちゅ！
+                </div>
+            </div>
+        `;
 
         // 6. satoriでSVGを生成する
-        const svg = await satori(element, {
+        const svg = await satori(markup, {
             width: 1200, height: 1000,
             fonts: [
                 {
@@ -1028,7 +983,7 @@ client.on('interactionCreate', async (interaction) => {
         const pngData = resvg.render();
         const pngBuffer = pngData.asPng();
 
-        // 8. 最後にDiscordに送信！Embedは使わず、画像を直接送るちゅ。
+        // 8. 最後にDiscordに送信！
         const attachment = new AttachmentBuilder(pngBuffer, { name: 'tarot3_reading.png' });
         await interaction.editReply({ files: [attachment] });
     }
