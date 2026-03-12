@@ -2495,22 +2495,29 @@ client.on('interactionCreate', async (interaction) => {
         }
 
         // 🔢 ヒットアンドブロー (モーダルの送信)
+        // 🔢 ヒットアンドブロー (モーダルの送信)
         else if (interaction.isModalSubmit() && interaction.customId === 'modal_hitandblow') {
-            const guess = interaction.options.getString('guess');
-        const answer = generateAnswer(); 
-        const result = checkHitAndBlow(answer, guess);
+            // 💡 修正：モーダルの入力値は options ではなく fields.getTextInputValue で受け取るちゅ！
+            const guess = interaction.fields.getTextInputValue('input_guess');
+            const answer = generateAnswer(); 
+            const result = checkHitAndBlow(answer, guess);
 
-        const embed = new EmbedBuilder()
-            .setColor(result.hit === 4 ? 0xFFD700 : 0x0099FF)
-            .setTitle('🔢 ヒットアンドブローの結果')
-            .setDescription(`あなたの予想: **${guess}**`)
-            .addFields(
-                { name: '結果', value: `**${result.hit}** Hit / **${result.blow}** Blow`, inline: true },
-                { name: '判定', value: result.hit === 4 ? '🎉 チーズの匂いがする！' : '何も落ちてないみたい...' }
-            )
-            .setFooter({ text: '※1回ごとに正解が変わるモードです。' });
+            const embed = new EmbedBuilder()
+                .setColor(result.hit === 4 ? 0xFFD700 : 0x0099FF)
+                .setTitle('🔢 ヒットアンドブローの結果')
+                .setDescription(`あなたの予想: **${guess}**`)
+                .addFields(
+                    { name: '結果', value: `**${result.hit}** Hit / **${result.blow}** Blow`, inline: true },
+                    { name: '判定', value: result.hit === 4 ? '🎉 チーズの匂いがする！' : '何も落ちてないみたい...' }
+                )
+                .setFooter({ text: '※1回ごとに正解が変わるモードです。' });
 
-        await interaction.editReply({ embeds: [embed] });
+            // 💡 元のメニューボタンを綺麗に消して、結果を表示するちゅ！
+            await interaction.editReply({ 
+                content: 'ヒット＆ブローの結果だちゅ！🎯', 
+                embeds: [embed], 
+                components: [] 
+            });
         }
 
         // 🐭 ねずみ画像関連
