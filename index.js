@@ -3071,12 +3071,13 @@ client.on('interactionCreate', async (interaction) => {
 
     // 💡 修正：バトルとランキングは「どのサーバーでも全員に見える（公開）」のが正しいから、ephemeralの魔法は使わないちゅ！
     else if (interaction.commandName === 'pet_battle') {
+        // バトルはみんなに見えるように ephemeral は使わない設定だちゅ
         await interaction.deferReply(); 
         const challengerId = interaction.user.id;
         const opponentUser = interaction.options.getUser('opponent');
         const opponentId = opponentUser.id;
 
-        let myPet = userPets[challengerId]; //
+        let myPet = userPets[challengerId];
         let oppPet = userPets[opponentId];
 
         if (!myPet) return interaction.editReply({ content: 'あなたは相棒を持っていないちゅ！🌱' });
@@ -3104,32 +3105,79 @@ client.on('interactionCreate', async (interaction) => {
             new ButtonBuilder().setCustomId('btn_special').setLabel('🔥 必殺技').setStyle(ButtonStyle.Danger).setDisabled(myState.sp < 10)
         );
 
-        // 初回描画
-        const pngBuffer = await generatePetBattleCanvas(myPet, oppPet, myState, oppState, battleLog, turn);
-        const attachment = new AttachmentBuilder(pngBuffer, { name: 'battle.png' });
-        const message = await interaction.editReply({ content: 'バトルの幕開けだちゅ！⚔️', files: [attachment], components: [getActionRow()] });
+        // 💡 ターンごとの画面を生成して送る魔法の関数
+        const sendBattleTurn = async (isFinal = false) => {
+            const pngBuffer = await generatePetBattleCanvas(myPet, oppPet, myState, oppState, battleLog, turn);
+            // 💡 毎回違う名前（turnを含める）にすることで、Discordのキャッシュを回避するちゅ！
+            const attachment = new AttachmentBuilder(pngBuffer, { name: `battle_t${turn}_${Date.now()}.png` });
+            
+            await interaction.editReply({ 
+                content: isFinal ? '✨ 決着がついたちゅ！！' : `⚔️ バトル進行中！ (ターン ${turn})`, 
+                files: [attachment], 
+                components: isFinal ? [] : [getActionRow()] 
+            });
+        };
+
+        // 最初の画面を表示
+        await sendBattleTurn();
         
+        const message = await interaction.fetchReply();
         const collector = message.createMessageComponentCollector({ filter: i => i.user.id === challengerId, time: 300000 });
 
         collector.on('collect', async i => {
             await i.deferUpdate();
             let myAction = i.customId;
+            // 相手（NPC）の行動決定
             let oppAction = (oppState.sp >= 10 && Math.random() < 0.7) ? 'btn_special' : ['btn_atk', 'btn_atk', 'btn_def', 'btn_sp'][Math.floor(Math.random() * 4)];
 
-            battleLog = ""; // ターンごとにログをリセットして見やすくするちゅ
-            
-            // ... (ここに既存の doAction とダメージ計算ロジックを入れる)
-            // ※文字数制限のため、内部ロジックは以前のコードと同じものを使用してちゅ
+            battleLog = ""; 
 
-            const updatePng = await generatePetBattleCanvas(myPet, oppPet, myState, oppState, battleLog, turn);
-            const updateAttach = new AttachmentBuilder(updatePng, { name: `battle_t${turn}.png` });
+            // 💡 ダメージ計算の実行
+            const doAction = (isMe, action, isEnemyDefending) => {
+                let attackerBase = isMe ? myPet : oppPet;
+                let attackerState = isMe ? myState : oppState;
+                let defenderState = isMe ? oppState : myState;
+                let defenderBase = isMe ? oppPet : myPet;
+
+                if (action === 'btn_atk') {
+                    let dmg = Math.max(1, (attackerState.atk + Math.floor(Math.random() * 4)) - (isEnemyDefending ? defenderState.def * 2 : defenderState.def));
+                    defenderState.hp = Math.max(0, defenderState.hp - dmg);
+                    defenderState.stagger -= dmg;
+                    battleLog += `🗡️ ${attackerBase.name}: ${dmg}ダメ！\n`;
+                } else if (action === 'btn_def') {
+                    attackerState.stagger = Math.min(attackerBase.staggerMax || 20, attackerState.stagger + 10);
+                    battleLog += `🛡️ ${attackerBase.name}: ガード＆回復！\n`;
+                } else if (action === 'btn_sp') {
+                    attackerState.sp += 5;
+                    battleLog += `🌀 ${attackerBase.name}: 集中(SP+5)\n`;
+                } else if (action === 'btn_special') {
+                    attackerState.sp -= 10;
+                    let dmg = Math.floor(attackerState.atk * 2.5);
+                    defenderState.hp = Math.max(0, defenderState.hp - dmg);
+                    battleLog += `💥 ${attackerBase.name}: 必殺技で ${dmg}ダメ！\n`;
+                }
+            };
+
+            // 素早さ判定
+            if (myState.spd >= oppState.spd) {
+                doAction(true, myAction, oppAction === 'btn_def');
+                if (oppState.hp > 0) doAction(false, oppAction, myAction === 'btn_def');
+            } else {
+                doAction(false, oppAction, myAction === 'btn_def');
+                if (myState.hp > 0) doAction(true, myAction, oppAction === 'btn_def');
+            }
 
             if (myState.hp <= 0 || oppState.hp <= 0) {
                 collector.stop();
             } else {
-                await interaction.editReply({ files: [updateAttach], components: [getActionRow()] });
+                turn++; // 💡 ターンを増やす！
+                await sendBattleTurn(); // 💡 次のターンを描画して上書き！
             }
         });
+
+        collector.on('end', async () => {
+            // 決着がついた時の最終画面
+            await sendBattleTurn(true);
 
         collector.on('end', async () => {
             if (!isGameOver) {
