@@ -2661,7 +2661,7 @@ client.on('interactionCreate', async (interaction) => {
                 level: 1,
                 exp: 0,
                 hp: targetPet.baseHp,
-                maxHp: target教えて.baseHp,
+                maxHp: targetPet.baseHp,
                 atk: targetPet.baseAtk,
                 def: targetPet.baseDef,
                 spd: targetPet.baseSpd,
