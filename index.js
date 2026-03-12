@@ -2394,12 +2394,13 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     // 💡 【超・軽量爆速版】注文追加時の処理 (注文した寿司の画像！)
+    // 💡 【超・軽量爆速版】注文追加時の処理 (画像を差し替えてメニューを復活させる！)
     else if (interaction.isStringSelectMenu() && interaction.customId === 'oaiso_add_item') {
-        await interaction.deferUpdate();
+        await interaction.deferUpdate(); // 💡 これを使うと元のメッセージを上書きできるちゅ！
         const userId = interaction.user.id;
         const game = oaisoGames.get(userId);
 
-        if (!game) return interaction.followUp({ content: 'ゲーム情報が見つからないちゅ。もう一度 `/sushi_oaiso` を打ってちゅ！', ephemeral: isHidden });
+        if (!game) return interaction.followUp({ content: 'ゲーム情報が見つからないちゅ。もう一度 `/sushi_oaiso` を打ってちゅ！', ephemeral: true });
 
         const selectedIndex = parseInt(interaction.values[0], 10);
         const selectedSushi = sushiMenu[selectedIndex];
@@ -2409,29 +2410,51 @@ client.on('interactionCreate', async (interaction) => {
 
         try {
             const extraMsg = `へいお待ち！ ${selectedSushi.name} を追加したちゅ。`;
-            // 💡 注文が通ったら、選んだ寿司（selectedSushi.image）を表示するちゅ！
             const pngBuffer = await generateOaisoCanvas(game, 'playing', extraMsg, selectedSushi.image);
             const attachment = new AttachmentBuilder(pngBuffer, { name: 'oaiso_update.png' });
 
-            await interaction.followUp({ 
-                content: '注文を追加したちゅ！🍣', 
+            // 💡 修正：ここでメニューとボタンを「もう一度作り直す」ちゅ！
+            // これでDiscordの「選択済み」状態がリセットされて、同じお寿司も連続で頼めるようになるちゅ！
+            const sushiOptions = sushiMenu.map((item, index) => ({
+                label: `${item.name}`,
+                value: index.toString(),
+                emoji: '🍣'
+            }));
+
+            const selectRow = new ActionRowBuilder().addComponents(
+                new StringSelectMenuBuilder()
+                    .setCustomId('oaiso_add_item')
+                    .setPlaceholder('どんどん注文するちゅ！(何個でもOK)')
+                    .addOptions(sushiOptions)
+            );
+
+            const buttonRow = new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setCustomId('oaiso_bill_please')
+                    .setLabel('おあいそ！（会計）💰')
+                    .setStyle(ButtonStyle.Success)
+            );
+
+            // 💡 修正：followUpではなく「editReply」を使うと、同じ場所で画像とメニューが切り替わるちゅ！
+            await interaction.editReply({ 
+                content: `🍣 ${selectedSushi.name} を握ったちゅ！次はどうするちゅ？`, 
                 embeds: [], 
                 files: [attachment], 
-                ephemeral: isHidden 
+                components: [selectRow, buttonRow] // メニューを再セット！
             });
         } catch (e) {
             console.error('注文追加エラー:', e);
-            await interaction.followUp({ content: '注文が通らなかったちゅ…', ephemeral: isHidden });
+            await interaction.followUp({ content: '注文が通らなかったちゅ…', ephemeral: true });
         }
     }
 
-    // 💡 【超・軽量爆速版】おあいそボタンを押した時の結果発表 (大将の画像に戻る！)
+    // 💡 【超・軽量爆速版】おあいそボタンを押した時の結果発表 (メニューを消して結果を表示！)
     else if (interaction.isButton() && interaction.customId === 'oaiso_bill_please') {
         await interaction.deferUpdate();
         const userId = interaction.user.id;
         const game = oaisoGames.get(userId);
 
-        if (!game) return interaction.followUp({ content: 'ゲーム情報が見つからないちゅ。', ephemeral: isHidden });
+        if (!game) return interaction.followUp({ content: 'ゲーム情報が見つからないちゅ。', ephemeral: true });
 
         const diff = game.currentTotal - game.target;
         let resultMsg = "";
@@ -2445,22 +2468,21 @@ client.on('interactionCreate', async (interaction) => {
         }
 
         try {
-            // 💡 結果発表は、大将（daisho.jpg）に戻して反応を見せるちゅ！
             const pngBuffer = await generateOaisoCanvas(game, 'result', resultMsg, 'daisho.jpg');
             const attachment = new AttachmentBuilder(pngBuffer, { name: 'oaiso_result.png' });
 
             oaisoGames.delete(userId);
             
-            await interaction.followUp({ 
+            // 💡 修正：ここも editReply にして、components（ボタン類）を空にして消すちゅ！
+            await interaction.editReply({ 
                 content: 'おあいそだちゅ！結果は…？🍣', 
                 embeds: [], 
-                components: [], 
-                files: [attachment], 
-                ephemeral: isHidden 
+                components: [], // これでメニューが綺麗に消えるちゅ！
+                files: [attachment]
             });
         } catch (e) {
             console.error('おあいそ結果エラー:', e);
-            await interaction.followUp({ content: '計算機が壊れちゃったちゅ…', ephemeral: isHidden });
+            await interaction.followUp({ content: '計算機が壊れちゃったちゅ…', ephemeral: true });
         }
     }
 
