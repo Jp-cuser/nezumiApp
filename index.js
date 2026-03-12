@@ -882,12 +882,12 @@ client.on('interactionCreate', async (interaction) => {
     // 💡 【超進化・修正版】/tarot3 コマンド (satoriによる1枚画像出力)
     else if (interaction.commandName === 'tarot3') {
         await interaction.deferReply({ ephemeral: isHidden });
+        await interaction.editReply({ content: '🌌 星の導きを読み解いているちゅ…！少しだけ待っててね！🐭✨' });
 
         const positions = ['過去 🕰️', '現在 📍', '未来 🚀'];
         const drawnResults = []; 
         let tempDeck = [...tarotCards];
 
-        // 1. まずはカードを3枚引く
         for (let i = 0; i < 3; i++) {
             const personalSeed = getPersonalDailyRandom(interaction.user.id, (i + 1) * 777);
             const cardIndex = Math.floor(personalSeed * tempDeck.length);
@@ -899,93 +899,78 @@ client.on('interactionCreate', async (interaction) => {
             drawnResults.push({ name: card.name, isReversed: isReversed, card: card, position: positions[i] });
         }
 
-        // 2. 引いたカードのBase64画像データを取得するちゅ
-        const cardImages = [];
-        for (const result of drawnResults) {
-            const base64 = await getCardImageBase64(result.card.image, result.isReversed);
-            cardImages.push(base64);
-        }
+        // 💡 高速化の魔法！「画像の連結」と「Geminiの占い」を同時にやるちゅ！
+        
+        // ① 画像の処理（Sharpを使って、3枚のカードを横に並べた1枚の画像を作るちゅ！）
+        const createCompositeImage = async () => {
+            try {
+                const imageBuffers = await Promise.all(drawnResults.map(async (result) => {
+                    const imagePath = path.join(__dirname, 'images', result.card.image);
+                    if (!fs.existsSync(imagePath)) return null;
+                    let transform = sharp(imagePath).resize(200, 344); // 扱いやすいサイズに
+                    if (result.isReversed) transform = transform.rotate(180);
+                    return await transform.toBuffer();
+                }));
 
-        // 3. Geminiから統合リーディングを取得する
-        let geminiExplanation = await getGeminiReading3(drawnResults, interaction.user.username);
-        if (!geminiExplanation) geminiExplanation = "運命の糸が絡まってうまく読めなかったちゅ…。";
+                const compositeList = [];
+                for (let i = 0; i < 3; i++) {
+                    if (imageBuffers[i]) {
+                        compositeList.push({
+                            input: imageBuffers[i],
+                            top: 0,
+                            left: i * 220 // 20pxの隙間を空けて横に並べるちゅ
+                        });
+                    }
+                }
 
-        // 解説テキストが長すぎるとはみ出るから短くするちゅ
-        const maxTextLength = 400;
-        const shortExplanation = geminiExplanation.length > maxTextLength ? geminiExplanation.slice(0, maxTextLength) + '...' : geminiExplanation;
+                if (compositeList.length === 0) return null;
 
-        // 4. 物語を生成する
+                // 640x344 の透明なキャンバスに3枚の画像を貼り付けるちゅ
+                return await sharp({
+                    create: { width: 640, height: 344, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } }
+                })
+                .composite(compositeList)
+                .png()
+                .toBuffer();
+            } catch (e) {
+                console.error("画像合成エラー:", e);
+                return null;
+            }
+        };
+
+        // ② Geminiの占い処理
+        const geminiPromise = getGeminiReading3(drawnResults, interaction.user.username);
+
+        // 画像の合成と占いを同時に待つ！
+        const [finalImageBuffer, geminiExplanation] = await Promise.all([createCompositeImage(), geminiPromise]);
+
+        const finalExplanation = geminiExplanation || "運命の糸が絡まってうまく読めなかったちゅ…。";
         const storyResult = generateTarotStory(drawnResults[0], drawnResults[1], drawnResults[2]);
 
-        // 5. 🎙️ satoriを使って画像をデザインするちゅ！
-        // 💡 React.createElementを使わずに、satoriが絶対にエラーを起こさない「生のデータ形式」で書き直したちゅ！
-        const markup = html`
-            <div style="display: flex; flex-direction: column; align-items: center; width: 1200px; height: 1000px; background-color: #1a1a1a; color: #e0e0e0; font-family: NotoSansJP; padding: 40px; box-sizing: border-box; border-radius: 20px; border: 4px solid #5865F2;">
-                
-                <div style="font-size: 48px; font-weight: bold; margin-bottom: 30px; color: #FFD700;">
-                    ✨ ${interaction.user.username}さんの運命の3枚引き ✨
-                </div>
+        // 💡 Discordの「Embed」を使って、最高に綺麗にレイアウトするちゅ！
+        const embed = new EmbedBuilder()
+            .setColor(0x5865F2)
+            .setTitle(`✨ ${interaction.user.username}さんの運命の3枚引き ✨`)
+            .setDescription(`**📖 あなたの物語: ${storyResult.storyType}**\n*${storyResult.message}*\n\n**🐭 ねずみの統合リーディング**\n${finalExplanation}`)
+            .addFields(
+                { name: drawnResults[0].position, value: `**${drawnResults[0].card.name}**\n${drawnResults[0].isReversed ? '逆位置 🙃' : '正位置 ✨'}`, inline: true },
+                { name: drawnResults[1].position, value: `**${drawnResults[1].card.name}**\n${drawnResults[1].isReversed ? '逆位置 🙃' : '正位置 ✨'}`, inline: true },
+                { name: drawnResults[2].position, value: `**${drawnResults[2].card.name}**\n${drawnResults[2].isReversed ? '逆位置 🙃' : '正位置 ✨'}`, inline: true }
+            )
+            .setFooter({ text: `今日（${getJSTInfo().displayDate}）の運命だちゅ！` });
 
-                <div style="display: flex; justify-content: space-around; width: 100%; margin-bottom: 40px;">
-                    ${drawnResults.map((result, i) => `
-                        <div style="display: flex; flex-direction: column; align-items: center; width: 300px;">
-                            <div style="font-size: 28px; margin-bottom: 10px; color: #00FA9A;">${result.position}</div>
-                            
-                            ${cardImages[i] 
-                                ? `<img src="${cardImages[i]}" style="width: 250px; height: 430px; border-radius: 10px; margin-bottom: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.5);" />` 
-                                : `<div style="width: 250px; height: 430px; background-color: #333; border-radius: 10px; margin-bottom: 10px; display: flex; align-items: center; justify-content: center;">画像なし</div>`
-                            }
-                            
-                            <div style="font-size: 22px; font-weight: bold;">${result.card.name}</div>
-                            <div style="font-size: 18px; color: ${result.isReversed ? '#FF6347' : '#e0e0e0'};">
-                                ${result.isReversed ? '逆位置 🙃' : '正位置 ✨'}
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
+        // 合成した3枚のカード画像をEmbedにくっつけるちゅ！
+        const replyOptions = { content: 'お待たせしたちゅ！あなたの運命だちゅ！✨' };
+        if (finalImageBuffer) {
+            const attachment = new AttachmentBuilder(finalImageBuffer, { name: 'tarot3_cards.png' });
+            embed.setImage('attachment://tarot3_cards.png');
+            replyOptions.embeds = [embed];
+            replyOptions.files = [attachment];
+        } else {
+            replyOptions.embeds = [embed];
+        }
 
-                <div style="display: flex; flex-direction: column; width: 100%; background-color: #2a2a2a; padding: 30px; border-radius: 15px; border: 1px solid #444;">
-                    <div style="font-size: 32px; font-weight: bold; color: #5865F2; margin-bottom: 15px;">
-                        📖 あなたの物語: ${storyResult.storyType}
-                    </div>
-                    <div style="font-size: 22px; font-style: italic; margin-bottom: 25px; line-height: 1.4;">
-                        ${storyResult.message}
-                    </div>
-                    <div style="font-size: 28px; font-weight: bold; color: #e0e0e0; margin-bottom: 10px;">
-                        🐭 ねずみの統合リーディング
-                    </div>
-                    <div style="font-size: 20px; line-height: 1.6;">
-                        ${shortExplanation}
-                    </div>
-                </div>
-
-                <div style="position: absolute; bottom: 20px; right: 30px; font-size: 18px; color: #888;">
-                    今日（${getJSTInfo().displayDate}）の運命だちゅ！
-                </div>
-            </div>
-        `;
-
-        // 6. satoriでSVGを生成する
-        const svg = await satori(markup, {
-            width: 1200, height: 1000,
-            fonts: [
-                {
-                    name: 'NotoSansJP',
-                    data: fontData, // 読み込んだフォントデータ
-                    weight: 400,
-                    style: 'normal',
-                },
-            ],
-        });
-
-        // 7. resvgでSVGをPNG画像に変換するちゅ！
-        const resvg = new Resvg(svg);
-        const pngData = resvg.render();
-        const pngBuffer = pngData.asPng();
-
-        // 8. 最後にDiscordに送信！
-        const attachment = new AttachmentBuilder(pngBuffer, { name: 'tarot3_reading.png' });
-        await interaction.editReply({ files: [attachment] });
+        await interaction.editReply(replyOptions);
     }
     else if (interaction.commandName === 'hitandblow') {
         await interaction.deferReply({ ephemeral: isHidden });
