@@ -734,6 +734,53 @@ const generateOaisoCanvas = async (game, state, extraMsg, displayImageName) => {
 
         return await canvas.encode('png');
     };
+    // 💡 【追加】寿司の注文メニュー専用のCanvas画像生成魔法だちゅ！
+const generateSushiWelcomeCanvas = async () => {
+    const canvasWidth = 800;
+    const canvasHeight = 500;
+    const canvas = createCanvas(canvasWidth, canvasHeight);
+    const ctx = canvas.getContext('2d');
+
+    // 背景と枠線（渋いブラウン）
+    ctx.fillStyle = '#3e2f23'; 
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+    ctx.strokeStyle = '#faedcd';
+    ctx.lineWidth = 10;
+    ctx.strokeRect(0, 0, canvasWidth, canvasHeight);
+
+    // タイトル
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 40px NotoSansJP';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText('- ねずみ寿司へようこそ！ -', canvasWidth / 2, 70);
+    
+    ctx.font = '24px NotoSansJP';
+    ctx.fillText('ウチ自慢のネタを見てってちゅ！', canvasWidth / 2, 110);
+
+    // 大将の画像
+    let img = null;
+    const imagePath = path.join(__dirname, 'images', 'daisho.jpg');
+    if (fs.existsSync(imagePath)) {
+        img = await loadImage(imagePath);
+        const imgWidth = 500;
+        const imgHeight = 250;
+        ctx.drawImage(img, (canvasWidth - imgWidth) / 2, 140, imgWidth, imgHeight);
+        ctx.strokeStyle = '#faedcd';
+        ctx.lineWidth = 4;
+        ctx.strokeRect((canvasWidth - imgWidth) / 2, 140, imgWidth, imgHeight);
+    } else {
+        ctx.fillStyle = '#2c221a';
+        ctx.fillRect((canvasWidth - 500) / 2, 140, 500, 250);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText('大将仕込み中...', canvasWidth / 2, 265);
+    }
+
+    ctx.font = 'bold 30px NotoSansJP';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText('- 下のリストから注文してちゅ！ -', canvasWidth / 2, 450);
+
+    return await canvas.encode('png');
+};
 //**************************************************************************************目指せネズミマスター******************************************************************************************** */
 const petDataFile = path.join(__dirname, 'pets.json');
 const petCatches = new Map();
