@@ -2961,7 +2961,6 @@ client.on('interactionCreate', async (interaction) => {
             const course = interaction.values[0]; // 選択されたコース
             const userId = interaction.user.id;
         const myPet = userPets[userId];
-        const course = interaction.options.getString('course');
         
         // 💡 クールダウン管理（もし一番上に無ければここでも動くようにしておくちゅ）
         if (!global.trainCooldowns) global.trainCooldowns = new Map();
@@ -3094,7 +3093,6 @@ client.on('interactionCreate', async (interaction) => {
         else if (interaction.isUserSelectMenu() && interaction.customId === 'select_pet_battle') {
             const opponentUser = interaction.users.first(); // 選択されたユーザーを取得！
             const challengerId = interaction.user.id;
-        const opponentUser = interaction.options.getUser('opponent');
         const opponentId = opponentUser.id;
 
         let myPet = userPets[challengerId];
