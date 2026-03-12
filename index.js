@@ -1498,7 +1498,7 @@ client.on('interactionCreate', async (interaction) => {
 
     // 💡 【超・軽量爆速版】/tarot コマンド (1枚引きのCanvas画像生成)
     if (interaction.commandName === 'tarot') {
-        await interaction.deferReply({ ephemeral: isHidden });
+        await interaction.deferReply();
         await interaction.editReply({ content: '🌌 星の導きを読み解きながら、今日の1枚を描いているちゅ…！🐭🎨' });
 
         const personalSeed = getPersonalDailyRandom(interaction.user.id);
@@ -1672,7 +1672,7 @@ client.on('interactionCreate', async (interaction) => {
     // 💡 【超・軽量爆速版】/tarot3 コマンド (Canvasを使った1枚画像生成・アスペクト比維持版)
     // 💡 【究極完成版】/tarot3 コマンド (アスペクト比維持＆空白ゼロの動的レイアウト)
     else if (interaction.commandName === 'tarot3') {
-        await interaction.deferReply({ ephemeral: isHidden });
+        await interaction.deferReply();
         await interaction.editReply({ content: '🌌 星の導きを読み解きながら、1枚の絵を描いているちゅ…！🐭🎨' });
 
         const positions = ['過去', '現在', '未来'];
@@ -1870,7 +1870,7 @@ client.on('interactionCreate', async (interaction) => {
 
     // 💡 【超・軽量爆速版】/weather コマンド (Canvasを使った1週間天気図の画像生成)
     else if (interaction.commandName === 'weather') {
-        await interaction.deferReply({ ephemeral: isHidden });
+        await interaction.deferReply();
         await interaction.editReply({ content: '🌤️ 空模様を調べて、1枚の天気図を描いているちゅ…！🐭🎨' });
 
         const pref = interaction.options.getString('prefecture');
@@ -2022,7 +2022,7 @@ client.on('interactionCreate', async (interaction) => {
     }
     // 💡 【超・軽量爆速版】動物画像表示コマンド (Canvasを使った写真カード風生成)
     if (['mouse', 'rat', 'nezumi'].includes(interaction.commandName)) {
-        await interaction.deferReply({ ephemeral: isHidden });
+        await interaction.deferReply();
         
         let selectedList = [];
         let titleMsg = "";
@@ -2115,7 +2115,7 @@ client.on('interactionCreate', async (interaction) => {
 
     // 💡 【超・軽量爆速版】/quiz コマンド (Canvasを使った動的クイズ画面)
     else if (interaction.commandName === 'quiz') {
-        await interaction.deferReply({ ephemeral: isHidden });
+        await interaction.deferReply();
         
         const isNezumi = Math.random() < 0.5;
         let category = isNezumi ? (Math.random() < 0.5 ? 'mouse' : 'rat') : 'not_mouse';
@@ -2234,7 +2234,7 @@ client.on('interactionCreate', async (interaction) => {
     // 💡 【超・軽量爆速版】/horoscope コマンド (Canvasを使った1枚絵の星座占い)
     // 💡 【超・軽量爆速版】/horoscope コマンド (Canvasを使った1枚絵の星座占い・空欄対策版)
     else if (interaction.commandName === 'horoscope') {
-        await interaction.deferReply({ ephemeral: isHidden });
+        await interaction.deferReply();
         await interaction.editReply({ content: '🌌 星座の瞬きを読み解いて、占いボードを描いているちゅ…！🐭🎨' });
 
         const ranking = signs.map((name, index) => {
@@ -2425,7 +2425,7 @@ client.on('interactionCreate', async (interaction) => {
 
     // 💡 【超・軽量爆速版】/rune コマンド (Canvasを使った1枚絵のルーン占い)
     else if (interaction.commandName === 'rune') {
-        await interaction.deferReply({ ephemeral: isHidden });
+        await interaction.deferReply();
         await interaction.editReply({ content: '🌌 石に刻まれた古代の文字を読み解いて、1枚の絵にしているちゅ…！🐭🎨' });
 
         const personalSeed = getPersonalDailyRandom(interaction.user.id, 777);
@@ -2596,7 +2596,7 @@ client.on('interactionCreate', async (interaction) => {
 
     // 💡 【超・軽量爆速版】/sushi_order コマンド (Canvasを使った大将のお出迎え)
     else if (interaction.commandName === 'sushi_order') {
-        await interaction.deferReply({ ephemeral: isHidden }); 
+        await interaction.deferReply(); 
 
         const sushiOptions = sushiMenu.map((item, index) => ({
             label: `${item.name} - ${item.price}円`,
@@ -2818,7 +2818,7 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     else if (interaction.commandName === 'sushi_oaiso') {
-        await interaction.deferReply({ ephemeral: isHidden });
+        await interaction.deferReply();
 
         const targetPrice = Math.floor(Math.random() * 4) * 1000 + 2000; 
         
@@ -3083,7 +3083,7 @@ client.on('interactionCreate', async (interaction) => {
     // 💡 【超・軽量爆速版】/pet_status コマンド (Canvasを使ったステータス画面)
     else if (interaction.commandName === 'pet_status') {
         const flags = isHidden ? MessageFlags.Ephemeral : undefined;
-        await interaction.deferReply({ flags });
+        await interaction.deferReply();
         
         const userId = interaction.user.id;
         const myPet = userPets[userId];
