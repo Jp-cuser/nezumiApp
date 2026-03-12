@@ -879,15 +879,15 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     // 💡 【超進化】/tarot3 コマンド (satoriによる1枚画像出力)
+    // 💡 【超進化・修正版】/tarot3 コマンド (satoriによる1枚画像出力)
     else if (interaction.commandName === 'tarot3') {
-        // satoriの処理は時間がかかるから、少し長めに待ってもらうちゅ
         await interaction.deferReply({ ephemeral: isHidden });
 
         const positions = ['過去 🕰️', '現在 📍', '未来 🚀'];
         const drawnResults = []; 
         let tempDeck = [...tarotCards];
 
-        // 1. まずはカードを3枚引く（ここは今までと同じだちゅ）
+        // 1. まずはカードを3枚引く
         for (let i = 0; i < 3; i++) {
             const personalSeed = getPersonalDailyRandom(interaction.user.id, (i + 1) * 777);
             const cardIndex = Math.floor(personalSeed * tempDeck.length);
@@ -899,79 +899,116 @@ client.on('interactionCreate', async (interaction) => {
             drawnResults.push({ name: card.name, isReversed: isReversed, card: card, position: positions[i] });
         }
 
-        // 2. 引いたカードのBase64画像データを取得するちゅ（新しい関数を使う！）
+        // 2. 引いたカードのBase64画像データを取得するちゅ
         const cardImages = [];
         for (const result of drawnResults) {
             const base64 = await getCardImageBase64(result.card.image, result.isReversed);
             cardImages.push(base64);
         }
 
-        // 3. Geminiから統合リーディングを取得する（これも今までと同じだちゅ）
+        // 3. Geminiから統合リーディングを取得する
         let geminiExplanation = await getGeminiReading3(drawnResults, interaction.user.username);
         if (!geminiExplanation) geminiExplanation = "運命の糸が絡まってうまく読めなかったちゅ…。";
 
-        // 解説テキストが長すぎると画像からはみ出るから、少し短くカットするちゅ
+        // 解説テキストが長すぎるとはみ出るから短くするちゅ
         const maxTextLength = 400;
         const shortExplanation = geminiExplanation.length > maxTextLength ? geminiExplanation.slice(0, maxTextLength) + '...' : geminiExplanation;
 
-        // 4. 物語を生成する（これも今までと同じだちゅ）
+        // 4. 物語を生成する
         const storyResult = generateTarotStory(drawnResults[0], drawnResults[1], drawnResults[2]);
 
         // 5. 🎙️ satoriを使って画像をデザインするちゅ！
-        // 💡 HTML/CSSのようなJSXという構文を使ってレイアウトを決めるちゅ。
-        const element = React.createElement('div', {
-            style: {
-                display: 'flex', flexDirection: 'column', alignItems: 'center',
-                width: '1200px', height: '1000px', // 全体のサイズ
-                backgroundColor: '#1a1a1a', color: '#e0e0e0', // ダークモード風
-                fontFamily: 'NotoSansJP', // さっきのフォントを使う指定だちゅ
-                padding: '40px', boxSizing: 'border-box',
-                borderRadius: '20px', border: '4px solid #5865F2'
+        // 💡 React.createElementを使わずに、satoriが絶対にエラーを起こさない「生のデータ形式」で書き直したちゅ！
+        const element = {
+            type: 'div',
+            props: {
+                style: {
+                    display: 'flex', flexDirection: 'column', alignItems: 'center',
+                    width: '1200px', height: '1000px',
+                    backgroundColor: '#1a1a1a', color: '#e0e0e0',
+                    fontFamily: 'NotoSansJP',
+                    padding: '40px', boxSizing: 'border-box',
+                    borderRadius: '20px', border: '4px solid #5865F2'
+                },
+                children: [
+                    // タイトル
+                    {
+                        type: 'div',
+                        props: {
+                            style: { fontSize: '48px', fontWeight: 'bold', marginBottom: '30px', color: '#FFD700' },
+                            children: `✨ ${interaction.user.username}さんの運命の3枚引き ✨`
+                        }
+                    },
+                    // カードエリア（横並び）
+                    {
+                        type: 'div',
+                        props: {
+                            style: { display: 'flex', justifyContent: 'space-around', width: '100%', marginBottom: '40px' },
+                            children: drawnResults.map((result, i) => ({
+                                type: 'div',
+                                props: {
+                                    style: { display: 'flex', flexDirection: 'column', alignItems: 'center', width: '300px' },
+                                    children: [
+                                        {
+                                            type: 'div',
+                                            props: { style: { fontSize: '28px', marginBottom: '10px', color: '#00FA9A' }, children: result.position }
+                                        },
+                                        cardImages[i] ? {
+                                            type: 'img',
+                                            props: { src: cardImages[i], style: { width: '250px', height: '430px', borderRadius: '10px', marginBottom: '10px' } }
+                                        } : {
+                                            type: 'div',
+                                            props: { style: { width: '250px', height: '430px', backgroundColor: '#333', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }, children: '画像なし' }
+                                        },
+                                        {
+                                            type: 'div',
+                                            props: { style: { fontSize: '22px', fontWeight: 'bold' }, children: result.card.name }
+                                        },
+                                        {
+                                            type: 'div',
+                                            props: { style: { fontSize: '18px', color: result.isReversed ? '#FF6347' : '#e0e0e0' }, children: result.isReversed ? '逆位置 🙃' : '正位置 ✨' }
+                                        }
+                                    ]
+                                }
+                            }))
+                        }
+                    },
+                    // 解説エリア
+                    {
+                        type: 'div',
+                        props: {
+                            style: { display: 'flex', flexDirection: 'column', width: '100%', backgroundColor: '#2a2a2a', padding: '30px', borderRadius: '15px', border: '1px solid #444' },
+                            children: [
+                                {
+                                    type: 'div',
+                                    props: { style: { fontSize: '32px', fontWeight: 'bold', color: '#5865F2', marginBottom: '15px' }, children: `📖 あなたの物語: ${storyResult.storyType}` }
+                                },
+                                {
+                                    type: 'div',
+                                    props: { style: { fontSize: '22px', fontStyle: 'italic', marginBottom: '25px', lineHeight: 1.4 }, children: storyResult.message }
+                                },
+                                {
+                                    type: 'div',
+                                    props: { style: { fontSize: '28px', fontWeight: 'bold', color: '#e0e0e0', marginBottom: '10px' }, children: '🐭 ねずみの統合リーディング' }
+                                },
+                                {
+                                    type: 'div',
+                                    props: { style: { fontSize: '20px', lineHeight: 1.6 }, children: shortExplanation }
+                                }
+                            ]
+                        }
+                    },
+                    // フッター
+                    {
+                        type: 'div',
+                        props: {
+                            style: { position: 'absolute', bottom: '20px', right: '30px', fontSize: '18px', color: '#888' },
+                            children: `今日（${getJSTInfo().displayDate}）の運命だちゅ！`
+                        }
+                    }
+                ]
             }
-        },
-            // タイトル
-            React.createElement('div', { style: { fontSize: '48px', fontWeight: 'bold', marginBottom: '30px', color: '#FFD700' } }, 
-                `✨ ${interaction.user.username}さんの運命の3枚引き ✨`
-            ),
-
-            // カードエリア（横並び）
-            React.createElement('div', { style: { display: 'flex', justifyContent: 'space-around', width: '100%', marginBottom: '40px' } },
-                drawnResults.map((result, i) => React.createElement('div', { key: i, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', width: '300px' } },
-                    // キャプション（過去・現在・未来）
-                    React.createElement('div', { style: { fontSize: '28px', marginBottom: '10px', color: '#00FA9A' } }, result.position),
-                    // カード画像（Base64データを埋め込む！）
-                    cardImages[i] ? React.createElement('img', { src: cardImages[i], style: { width: '250px', height: '430px', borderRadius: '10px', marginBottom: '10px', boxShadow: '0 4px 8px rgba(0,0,0,0.5)' } }) : React.createElement('div', { style: { width: '250px', height: '430px', backgroundColor: '#333', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' } }, '画像なし'),
-                    // カード名と正逆
-                    React.createElement('div', { style: { fontSize: '22px', fontWeight: 'bold' } }, result.card.name),
-                    React.createElement('div', { style: { fontSize: '18px', color: result.isReversed ? '#FF6347' : '#e0e0e0' } }, result.isReversed ? '逆位置 🙃' : '正位置 ✨')
-                ))
-            ),
-
-            // 解説エリア（物語 ＋ Gemini解説）
-            React.createElement('div', { style: { display: 'flex', flexDirection: 'column', width: '100%', backgroundColor: '#2a2a2a', padding: '30px', borderRadius: '15px', border: '1px solid #444' } },
-                // 物語タイトル
-                React.createElement('div', { style: { fontSize: '32px', fontWeight: 'bold', color: '#5865F2', marginBottom: '15px' } }, 
-                    `📖 あなたの物語: ${storyResult.storyType}`
-                ),
-                // 物語本文
-                React.createElement('div', { style: { fontSize: '22px', fontStyle: 'italic', marginBottom: '25px', lineHeight: '1.4' } }, 
-                    storyResult.message
-                ),
-                // Gemini解説タイトル
-                React.createElement('div', { style: { fontSize: '28px', fontWeight: 'bold', color: '#e0e0e0', marginBottom: '10px' } }, 
-                    '🐭 ねずみの統合リーディング'
-                ),
-                // Gemini解説本文
-                React.createElement('div', { style: { fontSize: '20px', lineHeight: '1.6' } }, 
-                    shortExplanation
-                )
-            ),
-
-            // フッター（日付）
-            React.createElement('div', { style: { position: 'absolute', bottom: '20px', right: '30px', fontSize: '18px', color: '#888' } }, 
-                `今日（${getJSTInfo().displayDate}）の運命だちゅ！`
-            )
-        );
+        };
 
         // 6. satoriでSVGを生成する
         const svg = await satori(element, {
