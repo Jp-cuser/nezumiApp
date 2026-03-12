@@ -1265,13 +1265,16 @@ client.on('interactionCreate', async (interaction) => {
         await interaction.editReply({ embeds: [embed] });
     }
 
+    // 💡 【超・軽量爆速版】/weather コマンド (Canvasを使った1週間天気図の画像生成)
     else if (interaction.commandName === 'weather') {
         await interaction.deferReply({ ephemeral: isHidden });
+        await interaction.editReply({ content: '🌤️ 空模様を調べて、1枚の天気図を描いているちゅ…！🐭🎨' });
+
         const pref = interaction.options.getString('prefecture');
         const target = prefCoords[pref.replace(/都|道|府|県/g, '')]; 
 
         if (!target) {
-            return interaction.editReply({ content: 'その都道府県の座標データが見つかりませんでした。' });
+            return interaction.editReply({ content: 'その都道府県の座標データが見つからなかったちゅ…。' });
         }
 
         try {
@@ -1279,10 +1282,17 @@ client.on('interactionCreate', async (interaction) => {
             const response = await axios.get(url);
             const daily = response.data.daily;
 
-            const embed = new EmbedBuilder()
-                .setColor(0x0099FF)
-                .setTitle(`☀️ ${pref}の1週間予報`)
-                .setDescription('ねずみが空模様を調べてきました！🐭');
+            // 絵文字を取り除く魔法（文字化け防止）
+            const stripEmoji = (str) => str.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '').replace(/[\u2600-\u27BF]/g, '').trim();
+
+            const canvasWidth = 800;
+            const dummyCanvas = createCanvas(1, 1);
+            const dummyCtx = dummyCanvas.getContext('2d');
+            
+            // 💡 1. データの準備と、各曜日の「パネルの高さ」を事前計算するちゅ！
+            const daysData = [];
+            let totalPanelsHeight = 0;
+            const panelPadding = 20;
 
             for (let i = 0; i < 7; i++) {
                 const code = daily.weathercode[i];
@@ -1290,21 +1300,123 @@ client.on('interactionCreate', async (interaction) => {
                 const maxTemp = daily.temperature_2m_max[i];
                 const minTemp = daily.temperature_2m_min[i];
             
-                const weatherStatus = getWeatherStatus(code);
-                const mouseComment = getMouseComment(code, rainProb, maxTemp);
+                const weatherStatus = stripEmoji(getWeatherStatus(code));
+                const mouseComment = stripEmoji(getMouseComment(code, rainProb, maxTemp));
+                const dateStr = daily.time[i];
 
-                embed.addFields({ 
-                    name: `📅 ${daily.time[i]}`, 
-                    value: `${weatherStatus}\n💧 降水確率: ${rainProb}%\n🌡️ ${maxTemp}℃ / ${minTemp}℃\n💬 *${mouseComment}*`, 
-                    inline: false 
-                });     
+                dummyCtx.font = '18px NotoSansJP';
+                // 右側のコメントエリアの幅 (全体の幅 - 左側の情報幅 - パディング)
+                const commentAreaWidth = canvasWidth - 360 - panelPadding * 3;
+                const commentHeight = measureTextHeight(dummyCtx, mouseComment, commentAreaWidth, 26);
+                
+                // パネルの高さ（最低90px、コメントが長ければそれに合わせる）
+                const panelHeight = Math.max(90, commentHeight + panelPadding * 2);
+                
+                daysData.push({
+                    date: dateStr,
+                    status: weatherStatus,
+                    maxTemp, minTemp, rainProb,
+                    comment: mouseComment,
+                    panelHeight
+                });
+                
+                totalPanelsHeight += panelHeight + 15; // 15はパネル同士の隙間
             }
-            await interaction.editReply({ embeds: [embed] });
+
+            // 💡 2. キャンバス全体の高さを決定！
+            const headerHeight = 120;
+            const footerHeight = 60;
+            const canvasHeight = headerHeight + totalPanelsHeight + footerHeight;
+
+            // 💡 3. ピッタリサイズのキャンバスを作って描画スタート！
+            const canvas = createCanvas(canvasWidth, canvasHeight);
+            const ctx = canvas.getContext('2d');
+
+            // 背景と枠線
+            ctx.fillStyle = '#1e1e24';
+            ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+            ctx.strokeStyle = '#0099FF';
+            ctx.lineWidth = 10;
+            ctx.strokeRect(0, 0, canvasWidth, canvasHeight);
+
+            // タイトル
+            ctx.textAlign = 'center';
+            ctx.font = 'bold 36px NotoSansJP';
+            ctx.fillStyle = '#87CEEB';
+            ctx.fillText(`${pref}の1週間予報`, canvasWidth / 2, 60);
+            
+            ctx.font = '20px NotoSansJP';
+            ctx.fillStyle = '#e0e0e0';
+            ctx.fillText('ねずみが空模様を調べてきたちゅ！', canvasWidth / 2, 95);
+
+            // 各曜日のパネルを描画
+            let currentY = headerHeight;
+            const startX = 40;
+            const panelWidth = canvasWidth - 80;
+
+            for (let i = 0; i < 7; i++) {
+                const day = daysData[i];
+                
+                // パネルの背景
+                ctx.fillStyle = '#2b2d31';
+                ctx.fillRect(startX, currentY, panelWidth, day.panelHeight);
+                ctx.strokeStyle = '#444';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(startX, currentY, panelWidth, day.panelHeight);
+
+                // 左側の情報 (日付、天気、気温、降水確率)
+                ctx.textAlign = 'left';
+                
+                // 日付
+                ctx.fillStyle = '#FFD700';
+                ctx.font = 'bold 22px NotoSansJP';
+                ctx.fillText(day.date, startX + 20, currentY + 35);
+
+                // 天気ステータス
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 24px NotoSansJP';
+                ctx.fillText(day.status, startX + 160, currentY + 35);
+
+                // 気温と降水確率
+                ctx.fillStyle = '#ff6b6b'; // 最高気温(赤系)
+                ctx.font = '20px NotoSansJP';
+                ctx.fillText(`${day.maxTemp}℃`, startX + 20, currentY + 70);
+                
+                ctx.fillStyle = '#ffffff';
+                ctx.fillText(`/`, startX + 80, currentY + 70);
+
+                ctx.fillStyle = '#4dabf7'; // 最低気温(青系)
+                ctx.fillText(`${day.minTemp}℃`, startX + 100, currentY + 70);
+
+                ctx.fillStyle = '#87CEEB'; // 降水確率
+                ctx.fillText(`降水確率: ${day.rainProb}%`, startX + 180, currentY + 70);
+
+                // 右側のねずみコメント
+                ctx.fillStyle = '#e0e0e0';
+                ctx.font = 'italic 18px NotoSansJP';
+                drawCanvasText(ctx, day.comment, startX + 360, currentY + 35, panelWidth - 360 - 20, 26);
+
+                // 次のパネルのY座標へ移動
+                currentY += day.panelHeight + 15;
+            }
+
+            // フッター
+            ctx.textAlign = 'right';
+            ctx.font = '16px NotoSansJP';
+            ctx.fillStyle = '#888';
+            ctx.fillText(`今日（${getJSTInfo().displayDate}）調べたお天気だちゅ！`, canvasWidth - 30, canvasHeight - 20);
+
+            // 💡 PNG画像に変換して送信！
+            const pngBuffer = await canvas.encode('png');
+            const attachment = new AttachmentBuilder(pngBuffer, { name: 'weather_canvas.png' });
+
+            await interaction.editReply({ content: 'お待たせしたちゅ！今週の空模様だちゅ！☁️✨', embeds: [], files: [attachment] });
+
         } catch (error) {
-            await interaction.editReply({ content: '天気情報の取得に失敗しました。' });
+            console.error('Canvas天気予報エラー:', error);
+            await interaction.editReply({ content: 'お天気を調べてる途中で、風に飛ばされちゃったちゅ…。' });
         }
     }
-
     if (['mouse', 'rat', 'nezumi'].includes(interaction.commandName)) {
         await interaction.deferReply({ ephemeral: isHidden });
         let selectedList = [];
