@@ -14,7 +14,6 @@ const path = require('path');
 const fs = require('fs');
 const cron = require('node-cron');
 require('dotenv').config();
-const sharp = require('sharp'); // sharpは既にあるちゅ
 // 💡 【追加】satori関連のライブラリ
 const satori = require('satori').default;
 const { Resvg } = require('@resvg/resvg-js');
