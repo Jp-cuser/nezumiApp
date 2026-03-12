@@ -1220,6 +1220,87 @@ const generatePetRankingCanvas = async (sortedPets) => {
 
     return await canvas.encode('png');
 };
+// 💡 【追加】ペットリリース専用のCanvas画像生成魔法だちゅ！
+const generatePetReleaseCanvas = async (pet, username) => {
+    const canvasWidth = 600;
+    const dummyCanvas = createCanvas(1, 1);
+    const dummyCtx = dummyCanvas.getContext('2d');
+
+    const stripEmoji = (str) => str.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '').replace(/[\u2600-\u27BF]/g, '').trim();
+    const safePetName = stripEmoji(pet.name);
+    
+    const releaseMsg = `Lv.${pet.level}まで一緒に過ごした ${safePetName} を自然に還したちゅ。\n今まで本当にありがとう、元気でね…！`;
+    const safeMsg = stripEmoji(releaseMsg);
+
+    // テキストの高さを計算
+    dummyCtx.font = 'italic 20px NotoSansJP';
+    const msgHeight = measureTextHeight(dummyCtx, safeMsg, canvasWidth - 120, 30);
+
+    // 画像読み込み
+    const species = petSpecies.find(s => s.name === pet.name);
+    const imgPath = path.join(__dirname, 'images', species ? species.image : 'default_pet.jpg');
+    let img = null;
+    let drawHeight = 300;
+    const contentWidth = 400;
+
+    if (fs.existsSync(imgPath)) {
+        img = await loadImage(imgPath);
+        drawHeight = contentWidth / (img.width / img.height);
+    }
+
+    const headerHeight = 100;
+    const imgSectionHeight = drawHeight + 40;
+    const boxHeight = msgHeight + 80;
+    const canvasHeight = headerHeight + imgSectionHeight + boxHeight + 60;
+
+    const canvas = createCanvas(canvasWidth, canvasHeight);
+    const ctx = canvas.getContext('2d');
+
+    // 背景（お別れの寂しさと温かさを表すグレー・ベージュ系）
+    ctx.fillStyle = '#1e1e24';
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+    ctx.strokeStyle = '#808080'; // 落ち着いたグレーの枠線
+    ctx.lineWidth = 10;
+    ctx.strokeRect(0, 0, canvasWidth, canvasHeight);
+
+    // タイトル
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 32px NotoSansJP';
+    ctx.fillStyle = '#e0e0e0';
+    ctx.fillText('🍃 自然へ還る相棒', canvasWidth / 2, 60);
+
+    let currentY = headerHeight;
+
+    // ペットの画像（モノクロっぽく加工はせず、そのままの姿を焼き付けるちゅ）
+    const imgX = (canvasWidth - contentWidth) / 2;
+    if (img) {
+        ctx.drawImage(img, imgX, currentY, contentWidth, drawHeight);
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 4;
+        ctx.strokeRect(imgX, currentY, contentWidth, drawHeight);
+    }
+    currentY += imgSectionHeight;
+
+    // メッセージボックス
+    ctx.fillStyle = '#2b2d31';
+    ctx.fillRect(40, currentY, canvasWidth - 80, boxHeight);
+    ctx.strokeStyle = '#808080';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(40, currentY, canvasWidth - 80, boxHeight);
+
+    ctx.textAlign = 'left';
+    ctx.font = 'italic 20px NotoSansJP';
+    ctx.fillStyle = '#ffffff';
+    drawCanvasText(ctx, safeMsg, 60, currentY + 50, canvasWidth - 120, 30);
+
+    // フッター
+    ctx.textAlign = 'right';
+    ctx.font = '14px NotoSansJP';
+    ctx.fillStyle = '#888';
+    ctx.fillText(`${username} との思い出を胸に…`, canvasWidth - 50, canvasHeight - 20);
+
+    return await canvas.encode('png');
+};
 //**************************************************************************************心の天気図（気分記録）******************************************************************************************** */
 const kibunDataFile = path.join(__dirname, 'kibun.json');
 let userKibun = {}; 
@@ -3460,8 +3541,11 @@ client.on('interactionCreate', async (interaction) => {
         }
     }
 
+    // 💡 【超・軽量爆速版】/pet_release コマンド (Canvas画像生成版)
     else if (interaction.commandName === 'pet_release') {
-        await interaction.deferReply({ ephemeral: isHidden }); 
+        const flags = isHidden ? MessageFlags.Ephemeral : undefined;
+        await interaction.deferReply({ flags }); 
+        
         const userId = interaction.user.id;
         const myPet = userPets[userId];
 
@@ -3469,29 +3553,33 @@ client.on('interactionCreate', async (interaction) => {
             return interaction.editReply({ content: 'お別れする相棒がいないちゅ！まずは `/pet_catch` で見つけるちゅ！🌱' });
         }
 
-        const petName = myPet.name;
-        const petEmoji = myPet.emoji;
-        const petLevel = myPet.level;
-        
-        const releasedRank = myPet.rank; 
+        try {
+            // 💡 1. 削除する前に、お別れ画像用のデータを生成するちゅ！
+            const pngBuffer = await generatePetReleaseCanvas(myPet, interaction.user.username);
+            const attachment = new AttachmentBuilder(pngBuffer, { name: `release_${Date.now()}.png` });
 
-        delete userPets[userId];
+            // 💡 2. データを削除し、ランキングを詰めるちゅ
+            const releasedRank = myPet.rank; 
+            delete userPets[userId];
 
-        for (const id in userPets) {
-            if (userPets[id].rank > releasedRank) {
-                userPets[id].rank -= 1;
+            for (const id in userPets) {
+                if (userPets[id].rank > releasedRank) {
+                    userPets[id].rank -= 1;
+                }
             }
+            savePets();
+
+            // 💡 3. 画像を送信してお別れだちゅ…
+            await interaction.editReply({ 
+                content: '相棒を自然に還してきたちゅ。元気でね…！🍃', 
+                embeds: [], 
+                files: [attachment] 
+            });
+
+        } catch (error) {
+            console.error('ペットリリース描画エラー:', error);
+            await interaction.editReply({ content: 'お別れの準備中に、切なくて筆が止まっちゃったちゅ…💦' });
         }
-
-        savePets();
-
-        const embed = new EmbedBuilder()
-            .setColor(0x808080) 
-            .setTitle(`🍃 ${petEmoji} ${petName} とお別れしたちゅ…`)
-            .setDescription(`Lv.${petLevel} まで一緒に過ごした ${petName} を自然に還したちゅ。\n今までありがとう、元気でね…！`)
-            .setFooter({ text: '新しい相棒を探す時は、もう一度 /pet_catch を打ってちゅ！' });
-
-        await interaction.editReply({ embeds: [embed] });
     }
     // 💡 /kibun コマンド (気分を記録する)
     else if (interaction.commandName === 'kibun') {
