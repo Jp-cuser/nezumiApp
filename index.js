@@ -899,15 +899,13 @@ client.on('interactionCreate', async (interaction) => {
             drawnResults.push({ name: card.name, isReversed: isReversed, card: card, position: positions[i] });
         }
 
-        // 💡 高速化の魔法！「画像の連結」と「Geminiの占い」を同時にやるちゅ！
-        
-        // ① 画像の処理（Sharpを使って、3枚のカードを横に並べた1枚の画像を作るちゅ！）
+        // ① 画像の処理（Sharpを使って、3枚のカードを横に並べた1枚の画像を作る）
         const createCompositeImage = async () => {
             try {
                 const imageBuffers = await Promise.all(drawnResults.map(async (result) => {
                     const imagePath = path.join(__dirname, 'images', result.card.image);
                     if (!fs.existsSync(imagePath)) return null;
-                    let transform = sharp(imagePath).resize(200, 344); // 扱いやすいサイズに
+                    let transform = sharp(imagePath).resize(200, 344); 
                     if (result.isReversed) transform = transform.rotate(180);
                     return await transform.toBuffer();
                 }));
@@ -918,14 +916,13 @@ client.on('interactionCreate', async (interaction) => {
                         compositeList.push({
                             input: imageBuffers[i],
                             top: 0,
-                            left: i * 220 // 20pxの隙間を空けて横に並べるちゅ
+                            left: i * 220 // 20pxの隙間を空けて綺麗に並べるちゅ
                         });
                     }
                 }
 
                 if (compositeList.length === 0) return null;
 
-                // 640x344 の透明なキャンバスに3枚の画像を貼り付けるちゅ
                 return await sharp({
                     create: { width: 640, height: 344, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } }
                 })
@@ -947,19 +944,23 @@ client.on('interactionCreate', async (interaction) => {
         const finalExplanation = geminiExplanation || "運命の糸が絡まってうまく読めなかったちゅ…。";
         const storyResult = generateTarotStory(drawnResults[0], drawnResults[1], drawnResults[2]);
 
-        // 💡 Discordの「Embed」を使って、最高に綺麗にレイアウトするちゅ！
+        // 💡 修正：横並び（addFields）をやめて、説明文にスッキリまとめるちゅ！
+        // これでスマホでもPCでも絶対にレイアウトが崩れないちゅ！
         const embed = new EmbedBuilder()
             .setColor(0x5865F2)
             .setTitle(`✨ ${interaction.user.username}さんの運命の3枚引き ✨`)
-            .setDescription(`**📖 あなたの物語: ${storyResult.storyType}**\n*${storyResult.message}*\n\n**🐭 ねずみの統合リーディング**\n${finalExplanation}`)
-            .addFields(
-                { name: drawnResults[0].position, value: `**${drawnResults[0].card.name}**\n${drawnResults[0].isReversed ? '逆位置 🙃' : '正位置 ✨'}`, inline: true },
-                { name: drawnResults[1].position, value: `**${drawnResults[1].card.name}**\n${drawnResults[1].isReversed ? '逆位置 🙃' : '正位置 ✨'}`, inline: true },
-                { name: drawnResults[2].position, value: `**${drawnResults[2].card.name}**\n${drawnResults[2].isReversed ? '逆位置 🙃' : '正位置 ✨'}`, inline: true }
+            .setDescription(
+                `**【引いたカード】**\n` +
+                `🕰️ **過去:** ${drawnResults[0].card.name} (${drawnResults[0].isReversed ? '逆位置 🙃' : '正位置 ✨'})\n` +
+                `📍 **現在:** ${drawnResults[1].card.name} (${drawnResults[1].isReversed ? '逆位置 🙃' : '正位置 ✨'})\n` +
+                `🚀 **未来:** ${drawnResults[2].card.name} (${drawnResults[2].isReversed ? '逆位置 🙃' : '正位置 ✨'})\n\n` +
+                `**📖 あなたの物語: ${storyResult.storyType}**\n` +
+                `*${storyResult.message}*\n\n` +
+                `**🐭 ねずみの統合リーディング**\n` +
+                `${finalExplanation}`
             )
             .setFooter({ text: `今日（${getJSTInfo().displayDate}）の運命だちゅ！` });
 
-        // 合成した3枚のカード画像をEmbedにくっつけるちゅ！
         const replyOptions = { content: 'お待たせしたちゅ！あなたの運命だちゅ！✨' };
         if (finalImageBuffer) {
             const attachment = new AttachmentBuilder(finalImageBuffer, { name: 'tarot3_cards.png' });
