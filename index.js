@@ -1464,15 +1464,7 @@ client.once('clientReady', async (c) => {
 
 //*******************************************************************************************メイン関数***************************************************************************************** */
 //*******************************************************************************************メイン関数***************************************************************************************** */
-client.on('interactionCreate', async (interaction) => {
-    // 💡 Modal(ポップアップ)やUserSelectMenuの判定も追加するちゅ！
-    if (!interaction.isChatInputCommand() && !interaction.isStringSelectMenu() && !interaction.isButton() && !interaction.isModalSubmit() && !interaction.isUserSelectMenu()) return;
-
-    // 💡 【修正】サーバーの制限を解除！どこでもみんなに見えるようにしたちゅ！
-    const isHidden = false;
-    const flags = undefined;
-
-    //*******************************************************************************************メイン関数***************************************************************************************** */
+//*******************************************************************************************メイン関数***************************************************************************************** */
 client.on('interactionCreate', async (interaction) => {
     // 💡 Modal(ポップアップ)やUserSelectMenuの判定も追加するちゅ！
     if (!interaction.isChatInputCommand() && !interaction.isStringSelectMenu() && !interaction.isButton() && !interaction.isModalSubmit() && !interaction.isUserSelectMenu()) return;
