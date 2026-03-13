@@ -23,7 +23,7 @@ const { html } = require('satori-html');
 const { createCanvas, GlobalFonts, loadImage } = require('@napi-rs/canvas');
 // 💡 【追加】フォントファイルを読み込む
 
-const fontPath = path.join(__dirname, 'fonts', 'akabara-cinderella.ttf');
+const fontPath = path.join(__dirname, 'fonts', 'LINESeedJP-Regular.ttf');
 try {
     GlobalFonts.registerFromPath(fontPath, 'NotoSansJP');
 } catch (e) {
