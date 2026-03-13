@@ -2730,6 +2730,11 @@ client.on('interactionCreate', async (interaction) => {
                 console.error('クイズの待機エラー:', e.message); // エラーの理由も出しておくちゅ
                 await interaction.editReply({ content: '時間切れだちゅ…。また遊んでね！', components: [] });
             }
+
+        } catch (error) {
+            console.error('Canvasクイズエラー:', error);
+            await interaction.editReply({ content: 'クイズの準備中にエラーが起きたちゅ…。' });
+        }
         }
 
     // 🍣 寿司の注文 (btn_sushi_order)
