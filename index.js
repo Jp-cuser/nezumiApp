@@ -2698,18 +2698,21 @@ client.on('interactionCreate', async (interaction) => {
                 new ButtonBuilder().setCustomId('incorrect_nezumi').setLabel('ねずみじゃない！').setEmoji('❌').setStyle(ButtonStyle.Danger)
             );
 
-            const response = await interaction.editReply({ 
+            // 💡 修正：response に直接入れるのではなく、一度送信してから fetchReply() で掴むちゅ！
+            await interaction.editReply({ 
                 content: '❓ クイズの時間だちゅ！下のボタンから選んでね！', 
                 embeds: [], // 古いEmbedが残らないように空にするちゅ
                 files: [attachment], 
                 components: [row] 
             });
 
+            // 💡 【超重要】送信したメッセージをここでしっかりと掴むちゅ！
+            const message = await interaction.fetchReply();
             const filter = i => i.user.id === interaction.user.id;
             
             try {
-                // 💡 4. ボタンが押されるのを待つちゅ（30秒）
-                const confirmation = await response.awaitMessageComponent({ filter, time: 30000 });
+                // 💡 4. ボタンが押されるのを待つちゅ（余裕をもって60秒に変更！）
+                const confirmation = await message.awaitMessageComponent({ filter, time: 60000 });
                 const userChoice = (confirmation.customId === 'correct_nezumi');
                 const isCorrect = (userChoice === isNezumi);
 
@@ -2723,14 +2726,10 @@ client.on('interactionCreate', async (interaction) => {
                     components: [] // ボタンを消すちゅ
                 });
             } catch (e) {
-                // 時間切れの場合
+                // 時間切れ、またはエラーの場合
+                console.error('クイズの待機エラー:', e.message); // エラーの理由も出しておくちゅ
                 await interaction.editReply({ content: '時間切れだちゅ…。また遊んでね！', components: [] });
             }
-
-        } catch (error) {
-            console.error('Canvasクイズエラー:', error);
-            await interaction.editReply({ content: 'クイズの準備中にエラーが起きたちゅ…。' });
-        }
         }
 
     // 🍣 寿司の注文 (btn_sushi_order)
