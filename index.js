@@ -1413,6 +1413,22 @@ client.once('clientReady', async (c) => {
                     required: false
                 }
             ]
+        },
+        {
+            name: 'design_list',
+            description: '【管理者用】現在登録されている日替わり看板のリストを確認するちゅ！'
+        },
+        {
+            name: 'design_delete',
+            description: '【管理者用】登録した日替わり看板のデザインを削除するちゅ！',
+            options: [
+                {
+                    name: 'date',
+                    type: 3, // STRING (文字列)
+                    description: '削除したい日付（例: 03-16）',
+                    required: true
+                }
+            ]
         }
     ];
 
@@ -3868,6 +3884,64 @@ client.on('interactionCreate', async (interaction) => {
         } catch (error) {
             console.error('デザイン保存エラー:', error);
             await interaction.editReply('ファイルの保存に失敗しちゃったちゅ…。');
+        }
+    }
+    // 💡 /design_list コマンド (登録済みデザインのリスト表示)
+    else if (interaction.commandName === 'design_list') {
+        await interaction.deferReply({ ephemeral: true }); // 自分だけに見えるようにするちゅ！
+        
+        const designsDir = path.join(__dirname, 'designs');
+
+        // フォルダ自体がない、または空っぽの場合
+        if (!fs.existsSync(designsDir)) {
+            return interaction.editReply('まだ何もデザインが登録されていないみたいだちゅ！📂');
+        }
+
+        const files = fs.readdirSync(designsDir);
+        const htmlFiles = files.filter(f => f.endsWith('.html'));
+
+        if (htmlFiles.length === 0) {
+            return interaction.editReply('登録されている日替わり看板はないみたいだちゅ！📂');
+        }
+
+        // リストのテキストを作るちゅ！
+        let listStr = '📋 **現在登録されている日替わりデザイン一覧だちゅ！**\n\n';
+        htmlFiles.forEach(file => {
+            const dateStr = file.replace('.html', '');
+            const hasCss = files.includes(`${dateStr}.css`);
+            listStr += `・📅 **${dateStr}** (HTML${hasCss ? ' ＆ CSS' : ''})\n`;
+        });
+
+        await interaction.editReply(listStr);
+    }
+
+    // 💡 /design_delete コマンド (デザインの削除)
+    else if (interaction.commandName === 'design_delete') {
+        await interaction.deferReply({ ephemeral: true });
+        
+        const dateStr = interaction.options.getString('date');
+        const designsDir = path.join(__dirname, 'designs');
+        
+        const htmlPath = path.join(designsDir, `${dateStr}.html`);
+        const cssPath = path.join(designsDir, `${dateStr}.css`);
+
+        let deleted = false;
+
+        // HTMLファイルを消すちゅ
+        if (fs.existsSync(htmlPath)) {
+            fs.unlinkSync(htmlPath);
+            deleted = true;
+        }
+        // CSSファイルを消すちゅ
+        if (fs.existsSync(cssPath)) {
+            fs.unlinkSync(cssPath);
+            deleted = true;
+        }
+
+        if (deleted) {
+            await interaction.editReply(`🗑️ **${dateStr}** のデザインを綺麗にお掃除したちゅ！✨`);
+        } else {
+            await interaction.editReply(`🤔 **${dateStr}** のデザインは見つからなかったちゅ。 \`/design_list\` で日付が合っているか確認してみてちゅ！`);
         }
     }
     }
