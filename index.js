@@ -4164,9 +4164,9 @@ const generateStickyImage = async (text, forcedDateStr = null) => {
                 </div>
             </div>`;
         } else if (tType === 'pop_pink') {
-            // 🌸 ポップ（パステルピンク）
+            // 🌸 ポップ（パステルピンク）※dottedをsolidに変更！
             finalMarkupStr = `
-            <div style="display: flex; flex-direction: row; width: 600px; height: 150px; background-color: #fff0f5; border: 6px dotted #ffb6c1; border-radius: 30px; overflow: hidden;">
+            <div style="display: flex; flex-direction: row; width: 600px; height: 150px; background-color: #fff0f5; border: 6px solid #ffb6c1; border-radius: 30px; overflow: hidden;">
                 <div style="display: flex; flex-direction: column; justify-content: center; width: 330px; padding: 20px; background-color: #ffe4e1; border-right: 4px dashed #ff69b4;">
                     <div style="display: flex; font-size: 26px; font-weight: bold; color: #ff1493; margin-bottom: 5px;">${boardData.title}</div>
                     <div style="display: flex; font-size: 16px; color: #ff69b4; margin-bottom: 12px;">${boardData.subtitle}</div>
