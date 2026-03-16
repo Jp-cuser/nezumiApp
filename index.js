@@ -4002,6 +4002,7 @@ const saveStickyData = () => {
 
 // 💡 Satoriを使った看板画像の生成関数（日替わり対応版）
 // 💡 Satoriを使った看板画像の生成関数（フルカラー絵文字対応版！）
+// 💡 Satoriを使った看板画像の生成関数（フルカラー絵文字「確実」表示版！）
 const generateStickyImage = async (text) => {
     const d = new Date();
     const jstD = new Date(d.getTime() + (9 * 60 * 60 * 1000));
@@ -4041,24 +4042,26 @@ const generateStickyImage = async (text) => {
         fonts: [
             { name: 'NotoSansJP', data: fontBuffer, weight: 400, style: 'normal' }
         ],
-        // 💡 【超重要】Twemoji（フルカラー絵文字）をネットから直接引っ張ってくる魔法だちゅ！
+        // 💡 【超重要】Twemojiを「直接ダウンロードしてBase64で埋め込む」魔法だちゅ！
         loadAdditionalAsset: async (languageCode, segment) => {
             if (languageCode === 'emoji') {
-                // 絵文字のコードをTwemojiのURL形式に変換するちゅ！
-                let u = "";
-                for (let i = 0; i < segment.length; i++) {
-                    let c = segment.charCodeAt(i);
-                    if (0xD800 <= c && c <= 0xDBFF) {
-                        let next = segment.charCodeAt(i + 1);
-                        u += (0x10000 + ((c - 0xD800) << 10) + (next - 0xDC00)).toString(16) + "-";
-                        i++;
-                    } else {
-                        u += c.toString(16) + "-";
-                    }
+                try {
+                    // 絵文字をTwemoji用のURLコードに変換する賢い魔法だちゅ
+                    const codePoints = Array.from(segment).map(char => char.codePointAt(0).toString(16));
+                    const u = codePoints.filter(c => c !== 'fe0f').join('-');
+                    
+                    // axiosを使ってネットから直接SVGデータをダウンロードするちゅ！
+                    const url = `https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/${u}.svg`;
+                    const res = await axios.get(url, { responseType: 'arraybuffer' });
+                    
+                    // 画像データをBase64に変換して、Satoriが読める形にして返すちゅ！
+                    return `data:image/svg+xml;base64,${Buffer.from(res.data).toString('base64')}`;
+                } catch (e) {
+                    console.error(`絵文字(${segment})の読み込みエラー:`, e.message);
+                    return ''; // 失敗してもプログラムが落ちないようにするちゅ
                 }
-                u = u.replace(/-$/, '').replace(/-fe0f/g, ''); 
-                return `https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/${u}.svg`;
             }
+            return '';
         }
     });
 
