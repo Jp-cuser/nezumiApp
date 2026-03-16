@@ -4066,7 +4066,6 @@ client.on('interactionCreate', async (interaction) => {
     // 💡 モーダルから入力された情報を受け取って保存する処理
     // 💡 モーダルから入力された情報を受け取って保存する処理
     else if (interaction.isModalSubmit() && interaction.customId.startsWith('modal_event_')) {
-        await interaction.deferReply({ ephemeral: true }); 
         
         // 💡 "modal_event_03-17_pop_pink" のようなIDから、日付とテンプレート名を切り離して取り出すちゅ！
         const parts = interaction.customId.split('_');
