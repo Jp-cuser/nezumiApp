@@ -4001,6 +4001,7 @@ const saveStickyData = () => {
 };
 
 // 💡 Satoriを使った看板画像の生成関数（日替わり対応版）
+// 💡 Satoriを使った看板画像の生成関数（フルカラー絵文字対応版！）
 const generateStickyImage = async (text) => {
     const d = new Date();
     const jstD = new Date(d.getTime() + (9 * 60 * 60 * 1000));
@@ -4032,29 +4033,33 @@ const generateStickyImage = async (text) => {
         </div>`;
     }
 
-    // 💡 日本語フォントを読み込むちゅ
     const fontBuffer = fs.readFileSync(path.join(__dirname, 'fonts', 'LINESeedJP-Regular.ttf'));
-    // 💡 【追加】絵文字用のフォントも読み込むちゅ！
-    const emojiFontBuffer = fs.readFileSync(path.join(__dirname, 'fonts', 'NotoColorEmoji.ttf'));
 
     const svg = await satori(html(finalMarkupStr), {
         width: 600,
         height: 150,
-        // 💡 【変更】フォントのリストに絵文字フォントを追加するちゅ！
         fonts: [
-            { 
-                name: 'NotoSansJP', 
-                data: fontBuffer, 
-                weight: 400, 
-                style: 'normal' 
-            },
-            { 
-                name: 'Noto Color Emoji', 
-                data: emojiFontBuffer, 
-                weight: 400, 
-                style: 'normal' 
+            { name: 'NotoSansJP', data: fontBuffer, weight: 400, style: 'normal' }
+        ],
+        // 💡 【超重要】Twemoji（フルカラー絵文字）をネットから直接引っ張ってくる魔法だちゅ！
+        loadAdditionalAsset: async (languageCode, segment) => {
+            if (languageCode === 'emoji') {
+                // 絵文字のコードをTwemojiのURL形式に変換するちゅ！
+                let u = "";
+                for (let i = 0; i < segment.length; i++) {
+                    let c = segment.charCodeAt(i);
+                    if (0xD800 <= c && c <= 0xDBFF) {
+                        let next = segment.charCodeAt(i + 1);
+                        u += (0x10000 + ((c - 0xD800) << 10) + (next - 0xDC00)).toString(16) + "-";
+                        i++;
+                    } else {
+                        u += c.toString(16) + "-";
+                    }
+                }
+                u = u.replace(/-$/, '').replace(/-fe0f/g, ''); 
+                return `https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/${u}.svg`;
             }
-        ]
+        }
     });
 
     const resvg = new Resvg(svg, { background: 'transparent', fitTo: { mode: 'original' } });
