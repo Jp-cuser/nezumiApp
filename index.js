@@ -1436,8 +1436,21 @@ client.once('clientReady', async (c) => {
                     required: true
                 }
             ]
+        },
+        // 💡 【追加】ここから下が新しいテストコマンドだちゅ！
+        {
+            name: 'design_test',
+            description: '【管理者用】指定した日付の看板デザインをテスト表示するちゅ！',
+            options: [
+                {
+                    name: 'date',
+                    type: 3, // STRING (文字列)
+                    description: 'テスト表示したい日付（例: 03-17）',
+                    required: true
+                }
+            ]
         }
-    ];
+    ]; // ⬅️ ここがコマンドリストの終わり
 
     const guildIds = ['1450709451488100396','1455097564759330958', '1480458980655366188']; 
     await client.application.commands.set([]); // グローバルコマンドをリセット
@@ -3971,6 +3984,26 @@ client.on('interactionCreate', async (interaction) => {
             await interaction.editReply(`🤔 **${dateStr}** のデザインは見つからなかったちゅ。 \`/design_list\` で日付が合っているか確認してみてちゅ！`);
         }
     }
+    // 💡 /design_test コマンド (指定した日付のデザインをプレビュー)
+    else if (interaction.commandName === 'design_test') {
+        await interaction.deferReply({ ephemeral: true }); // 誰にも見えないようにするちゅ！
+        
+        const dateStr = interaction.options.getString('date');
+        
+        try {
+            // 💡 2つ目の引数にテストしたい日付を渡して画像を作るちゅ！
+            const pngBuffer = await generateStickyImage('これはテスト表示だちゅ！', dateStr);
+            const attachment = new AttachmentBuilder(pngBuffer, { name: 'test_banner.png' });
+            
+            await interaction.editReply({ 
+                content: `📅 **${dateStr}** の看板デザインのテスト表示だちゅ！✨\n（※本番ではここにねずみの最新の言葉が入るちゅよ！）`, 
+                files: [attachment] 
+            });
+        } catch (e) {
+            console.error('テスト表示エラー:', e);
+            await interaction.editReply('画像の生成に失敗しちゃったちゅ…。HTMLやCSSに間違いがないか確認してちゅ！');
+        }
+    }
     }
 });
 // ==========================================================
@@ -4003,15 +4036,20 @@ const saveStickyData = () => {
 // 💡 Satoriを使った看板画像の生成関数（日替わり対応版）
 // 💡 Satoriを使った看板画像の生成関数（フルカラー絵文字対応版！）
 // 💡 Satoriを使った看板画像の生成関数（フルカラー絵文字「確実」表示版！）
-const generateStickyImage = async (text) => {
+// 💡 2つ目の引数に forcedDateStr を追加するちゅ！
+const generateStickyImage = async (text, forcedDateStr = null) => {
     const d = new Date();
     const jstD = new Date(d.getTime() + (9 * 60 * 60 * 1000));
     const month = String(jstD.getUTCMonth() + 1).padStart(2, '0');
     const day = String(jstD.getUTCDate()).padStart(2, '0');
-    const todayStr = `${month}-${day}`; 
+    
+    // 💡 指定があればそれを使う、無ければ今日の日付にするちゅ！
+    const todayStr = forcedDateStr || `${month}-${day}`; 
 
     const htmlPath = path.join(__dirname, 'designs', `${todayStr}.html`);
     const cssPath = path.join(__dirname, 'designs', `${todayStr}.css`);
+
+    // ... (この下の let finalMarkupStr = ''; から先は今まで通りでOKだちゅ！)
 
     let finalMarkupStr = '';
 
