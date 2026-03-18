@@ -4347,24 +4347,54 @@ const generateTempStickyImage = async (tempData) => {
 // ==========================================================
 // 📦 画像たちをセットにして準備するまとめ役だちゅ！
 // ==========================================================
+// ==========================================================
+// 📦 画像たちをセットにして準備するまとめ役だちゅ！
+// ==========================================================
 const getStickyAttachments = async () => {
-    const files = [];
+    let tempBuffer = null;
+    let dailyBuffer = await generateStickyImage('いつでも最新の情報をここでお知らせするちゅ！');
 
-    // 1. 臨時看板（もしあれば先頭(上)に追加するちゅ！）
+    // 1. 臨時看板（上）のデータがあれば画像を作るちゅ！
     const tempPath = path.join(__dirname, 'designs', 'temp_board.json');
     if (fs.existsSync(tempPath)) {
         try {
             const tempData = JSON.parse(fs.readFileSync(tempPath, 'utf8'));
-            const tempBuffer = await generateTempStickyImage(tempData);
-            files.push(new AttachmentBuilder(tempBuffer, { name: 'temp_banner.png' }));
+            tempBuffer = await generateTempStickyImage(tempData);
         } catch(e) { console.error('臨時看板エラー:', e); }
     }
 
-    // 2. 日替わり看板（いつもの）を次(下)に追加するちゅ！
-    const dailyBuffer = await generateStickyImage('いつでも最新の情報をここでお知らせするちゅ！');
-    files.push(new AttachmentBuilder(dailyBuffer, { name: 'sticky_banner.png' }));
+    // 2. もし臨時看板がなかったら、いつもの看板だけをそのまま返すちゅ！
+    if (!tempBuffer) {
+        return [new AttachmentBuilder(dailyBuffer, { name: 'sticky_banner.png' })];
+    }
 
-    return files; // 1枚〜2枚の画像をセットにして返すちゅ！
+    // 3. 両方ある場合は、「1枚の縦長画像」に合体させる魔法を使うちゅ！
+    try {
+        // 既に上の方で読み込んでいる魔法（Canvas）を使うちゅ！
+        const tempImg = await loadImage(tempBuffer);
+        const dailyImg = await loadImage(dailyBuffer);
+        
+        const gap = 15; // 2つの看板の間の隙間だちゅ（15px）
+        const canvasWidth = Math.max(tempImg.width, dailyImg.width); 
+        const canvasHeight = tempImg.height + dailyImg.height + gap;
+        
+        const canvas = createCanvas(canvasWidth, canvasHeight);
+        const ctx = canvas.getContext('2d');
+        
+        // 背景を透明にして、上に臨時看板、下に日替わり看板を描き込むちゅ！
+        ctx.drawImage(tempImg, 0, 0);
+        ctx.drawImage(dailyImg, 0, tempImg.height + gap);
+        
+        const mergedBuffer = await canvas.encode('png');
+        
+        // 💡 1枚の大きな画像としてDiscordに渡すちゅ！
+        return [new AttachmentBuilder(mergedBuffer, { name: 'sticky_banner.png' })];
+        
+    } catch (e) {
+        console.error('画像合体エラー:', e);
+        // 合体に失敗した時は、とりあえず日替わり看板だけ返すちゅ
+        return [new AttachmentBuilder(dailyBuffer, { name: 'sticky_banner.png' })];
+    }
 };
 
 // 💡 誰かがメッセージを書き込んだ時の処理
