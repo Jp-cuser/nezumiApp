@@ -1693,8 +1693,8 @@ client.on('interactionCreate', async (interaction) => {
             if (interaction.customId !== 'sushi_select_order' && interaction.customId !== 'oaiso_add_item' && interaction.customId !== 'oaiso_bill_please' && !interaction.customId.startsWith('btn_atk') && !interaction.customId.startsWith('btn_def') && !interaction.customId.startsWith('btn_sp') && !interaction.customId.startsWith('btn_special') && interaction.customId !== 'catch_attempt' && interaction.customId !== 'catch_ignore' && interaction.customId !== 'kibun_select_channel' && interaction.customId !== 'correct_nezumi' && interaction.customId !== 'incorrect_nezumi') {
                 try { 
                     if (interaction.isModalSubmit()) {
-                        // 💡 【修正】管理者用の看板設定モーダルは絶対に「自分だけに見える」ようにするちゅ！
-                        if (interaction.customId && interaction.customId.startsWith('modal_event_')) {
+                        // 💡 【修正】臨時看板(modal_temp_setup)も「自分だけに見える」に仲間入りさせるちゅ！
+                        if (interaction.customId && (interaction.customId.startsWith('modal_event_') || interaction.customId === 'modal_temp_setup')) {
                             await interaction.deferReply({ ephemeral: true });
                         } else {
                             // 他のゲームや天気のモーダルは設定を引き継ぐちゅ
@@ -4125,7 +4125,6 @@ client.on('interactionCreate', async (interaction) => {
     
     // 💡 /temp_remove コマンド (臨時看板を消す)
     else if (interaction.commandName === 'temp_remove') {
-        await interaction.deferReply({ ephemeral: true });
         const tempPath = path.join(__dirname, 'designs', 'temp_board.json');
         
         if (fs.existsSync(tempPath)) {
@@ -4138,7 +4137,6 @@ client.on('interactionCreate', async (interaction) => {
     
     // 💡 臨時看板のモーダル送信を受け取って保存する
     else if (interaction.isModalSubmit() && interaction.customId === 'modal_temp_setup') {
-        await interaction.deferReply({ ephemeral: true });
         
         const title = interaction.fields.getTextInputValue('title');
         const desc = interaction.fields.getTextInputValue('desc');
