@@ -4265,7 +4265,7 @@ const generateStickyImage = async (text, forcedDateStr = null) => {
                     return `data:image/svg+xml;base64,${Buffer.from(res.data).toString('base64')}`;
                 } catch (e) {
                     console.error(`絵文字(${segment})の読み込みエラー:`, e.message);
-                    return '';
+                    return ''
                 }
             }
             return '';
