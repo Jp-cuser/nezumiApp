@@ -1392,7 +1392,7 @@ client.once('clientReady', async (c) => {
         { name: 'kibun_resetchannel', description: '心の天気図のレポート送信先設定をリセット（解除）するちゅ！☁️' }
     ];
 
-    const guildIds = ['1450709451488100396','1455097564759330958', '1480458980655366188']; 
+    const guildIds = ['1450709451488100396','1480458980655366188', '1483795902610145463']; 
     await client.application.commands.set([]); // グローバルコマンドをリセット
 
     for (const id of guildIds) {
