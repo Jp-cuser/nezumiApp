@@ -1376,13 +1376,14 @@ client.once('clientReady', async (c) => {
     // 💡 統合コマンドと、裏機能(気分記録)だけにするちゅ！
     // 💡 統合コマンドと、裏機能(気分記録)だけにするちゅ！
     const data = [
+        // 💡 統合コマンドと、裏機能(気分記録)
         { 
             name: 'nezumi', 
             description: 'ねずみの機能（占い・ゲーム・相棒など）を使う総合メニューを開くちゅ！',
             options: [
                 {
                     name: 'hidden',
-                    type: 5, // 5 は BOOLEAN (True/False) の意味だちゅ！
+                    type: 5,
                     description: '結果を自分だけに見えるようにするかどうか選べるちゅ！(デフォルトはみんなに見えるちゅ)',
                     required: false
                 }
@@ -1390,82 +1391,51 @@ client.once('clientReady', async (c) => {
         },
         { name: 'kibun_setchannel', description: '心の天気図（週次レポート）を送信するチャンネルを、自分用に指定するちゅ！☁️' },
         { name: 'kibun_resetchannel', description: '心の天気図のレポート送信先設定をリセット（解除）するちゅ！☁️' },
+        
+        // ==========================================================
+        // 🔐 ここから下の「案内板」コマンドは、管理者(あなた)にしか見えないちゅ！
+        // ==========================================================
         {
             name: 'design_upload',
             description: '【管理者用】日替わり看板のHTML/CSSデザインを登録するちゅ！',
+            default_member_permissions: '8', // 💡 【追加】管理者のみ表示する魔法だちゅ！
             options: [
-                {
-                    name: 'date',
-                    type: 3, // STRING (文字列)
-                    description: '表示したい日付（例: 03-16 または 12-25）',
-                    required: true
-                },
-                // 💡 【追加】イベント名を入力する枠だちゅ！
-                {
-                    name: 'event_name',
-                    type: 3, // STRING (文字列)
-                    description: 'イベントの名前（例: ひな祭り、クリスマス）',
-                    required: true
-                },
-                {
-                    name: 'html_file',
-                    type: 11, // ATTACHMENT (ファイル添付)
-                    description: 'Satori用のHTMLファイル（文字を入れる場所には {{text}} と書いてちゅ！）',
-                    required: true
-                },
-                {
-                    name: 'css_file',
-                    type: 11, // ATTACHMENT (ファイル添付)
-                    description: '読み込ませたいCSSファイル（オプションだちゅ）',
-                    required: false
-                }
+                { name: 'date', type: 3, description: '表示したい日付（例: 03-16 または 12-25）', required: true },
+                { name: 'event_name', type: 3, description: 'イベントの名前（例: ひな祭り、クリスマス）', required: true },
+                { name: 'html_file', type: 11, description: 'Satori用のHTMLファイル', required: true },
+                { name: 'css_file', type: 11, description: '読み込ませたいCSSファイル', required: false }
             ]
         },
         {
             name: 'design_list',
-            description: '【管理者用】現在登録されている日替わり看板のリストを確認するちゅ！'
+            description: '【管理者用】現在登録されている日替わり看板のリストを確認するちゅ！',
+            default_member_permissions: '8' // 💡 【追加】管理者のみ表示！
         },
         {
             name: 'design_delete',
             description: '【管理者用】登録した日替わり看板のデザインを削除するちゅ！',
+            default_member_permissions: '8', // 💡 【追加】管理者のみ表示！
             options: [
-                {
-                    name: 'date',
-                    type: 3, // STRING (文字列)
-                    description: '削除したい日付（例: 03-16）',
-                    required: true
-                }
+                { name: 'date', type: 3, description: '削除したい日付（例: 03-16）', required: true }
             ]
         },
-        // 💡 【追加】ここから下が新しいテストコマンドだちゅ！
         {
             name: 'design_test',
             description: '【管理者用】指定した日付の看板デザインをテスト表示するちゅ！',
+            default_member_permissions: '8', // 💡 【追加】管理者のみ表示！
             options: [
-                {
-                    name: 'date',
-                    type: 3, // STRING (文字列)
-                    description: 'テスト表示したい日付（例: 03-17）',
-                    required: true
-                }
+                { name: 'date', type: 3, description: 'テスト表示したい日付（例: 03-17）', required: true }
             ]
         },
-        // 💡 【追加】モーダルで看板を設定するコマンドだちゅ！
-       // 💡 【追加】モーダルで看板を設定するコマンドだちゅ！
         {
             name: 'event_setup',
             description: '【管理者用】画面(モーダル)から文字を入力して、日替わり看板を設定するちゅ！',
+            default_member_permissions: '8', // 💡 【追加】管理者のみ表示！
             options: [
-                {
-                    name: 'date',
-                    type: 3, // STRING (文字列)
-                    description: '設定したい日付（例: 03-17）',
-                    required: true
-                },
-                // 💡 【追加】使いたいデザインを選べるようにするちゅ！
+                { name: 'date', type: 3, description: '設定したい日付（例: 03-17）', required: true },
                 {
                     name: 'template',
-                    type: 3, // STRING (文字列)
+                    type: 3,
                     description: '使いたいデザインテンプレートを選ぶちゅ！',
                     required: true,
                     choices: [
@@ -1706,15 +1676,25 @@ client.on('interactionCreate', async (interaction) => {
     // 🚀 5. モーダルの送信 ＆ 選択メニューの確定 ＆ 即実行ボタン
     // ==========================================================
     // (これ以降の処理は、元の処理と同じように deferUpdate() してから editReply() して画像を上書きするちゅ！)
-    else {
-        // 💡 【超重要】他人がボタンやメニューを横取りするのを防ぐ魔法だちゅ！
-        if ((interaction.isButton() || interaction.isStringSelectMenu() || interaction.isUserSelectMenu()) && interaction.message && interaction.message.interaction) {
-            // 最初にコマンドを打った本人じゃなかったら、こっそり弾くちゅ！
-            if (interaction.user.id !== interaction.message.interaction.user.id) {
-                return interaction.reply({ 
-                    content: 'これは他の人のメニューだちゅ！自分で `/nezumi` を打って遊んでちゅ！🐭', 
-                    flags: MessageFlags.Ephemeral 
-                }).catch(e => console.error('横取り防止メッセージの送信エラー:', e));
+    // ここに引っかかったら、まずはローディング状態にするちゅ
+        if (interaction.isButton() || interaction.isModalSubmit() || interaction.isStringSelectMenu() || interaction.isUserSelectMenu()) {
+            
+            // 例外処理：おあいそゲームの中のボタン・メニューは deferUpdate 済みなのでスキップ
+            if (interaction.customId !== 'sushi_select_order' && interaction.customId !== 'oaiso_add_item' && interaction.customId !== 'oaiso_bill_please' && !interaction.customId.startsWith('btn_atk') && !interaction.customId.startsWith('btn_def') && !interaction.customId.startsWith('btn_sp') && !interaction.customId.startsWith('btn_special') && interaction.customId !== 'catch_attempt' && interaction.customId !== 'catch_ignore' && interaction.customId !== 'kibun_select_channel' && interaction.customId !== 'correct_nezumi' && interaction.customId !== 'incorrect_nezumi') {
+                try { 
+                    if (interaction.isModalSubmit()) {
+                        // 💡 【修正】管理者用の看板設定モーダルは絶対に「自分だけに見える」ようにするちゅ！
+                        if (interaction.customId && interaction.customId.startsWith('modal_event_')) {
+                            await interaction.deferReply({ ephemeral: true });
+                        } else {
+                            // 他のゲームや天気のモーダルは設定を引き継ぐちゅ
+                            await interaction.deferReply({ flags: currentFlags });
+                        }
+                    } else {
+                        await interaction.deferUpdate(); 
+                        await interaction.editReply({ components: [] });
+                    }
+                } catch(e) {} 
             }
         }
 
@@ -4193,7 +4173,7 @@ const generateStickyImage = async (text, forcedDateStr = null) => {
         } else if (tType === 'pop_pink') {
             // 🌸 ポップ（パステルピンク）※dottedをsolidに変更！
             finalMarkupStr = `
-            <div style="display: flex; flex-direction: row; width: 600px; height: 150px; background-color: #fff0f5; border: 6px solid #ffb6c1; border-radius: 30px; overflow: hidden;">
+            <div style="display: flex; flex-direction: row; width: 600px; height: 150px; background-color: #fff0f5; border: 6px solid #ff6fa5; border-radius: 30px; overflow: hidden;">
                 <div style="display: flex; flex-direction: column; justify-content: center; width: 330px; padding: 20px; background-color: #ffe4e1; border-right: 4px dashed #ff69b4;">
                     <div style="display: flex; font-size: 26px; font-weight: bold; color: #ff1493; margin-bottom: 5px;">${boardData.title}</div>
                     <div style="display: flex; font-size: 16px; color: #ff69b4; margin-bottom: 12px;">${boardData.subtitle}</div>
