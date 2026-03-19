@@ -1,6 +1,7 @@
 const { 
     Client, 
     GatewayIntentBits, 
+    Partials,
     EmbedBuilder, 
     AttachmentBuilder,
     ActionRowBuilder,
@@ -44,6 +45,7 @@ const client = new Client({
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildMessageReactions,
     ],
+    partials: [Partials.Message, Partials.Reaction, Partials.User],
 });
 
 // --- タロット・ルーン等のデータ ---
@@ -179,6 +181,49 @@ const sushiMenu = [
     { name: 'ウニ軍艦 (1貫)', price: 1000, image: 's_uni.jpg', description: '口の中でとろける最高級品だちゅ！' },
     { name: 'カッパ巻き (4本)', price: 200, image: 's_kappa.jpg', description: 'さっぱり箸休めに最適だちゅ。' },
 ];
+// ==========================================================
+// 🏰 魔法魔術学校 寮対抗ポイントシステム
+// ==========================================================
+const HOUSE_ROLES = {
+    '1462472653985153085': { id: 'gryffindor', name: 'グリフィンドール', emoji: '🦁', color: '#740001' },
+    '1462404686333214794': { id: 'slytherin', name: 'スリザリン', emoji: '🐍', color: '#1A472A' },
+    '1462473089324552450': { id: 'ravenclaw', name: 'レイブンクロー', emoji: '🦅', color: '#0E1A40' },
+    '1462473160321663082': { id: 'hufflepuff', name: 'ハッフルパフ', emoji: '🦡', color: '#FFDB00' },
+    '1462474772863652051': { id: 'azkaban', name: 'アズカバン', emoji: '☠️', color: '#333333' }
+};
+
+const HOUSE_EMOJIS = {
+    '🦁': '1462472653985153085',
+    '🐍': '1462404686333214794',
+    '🦅': '1462473089324552450',
+    '🦡': '1462473160321663082',
+    '☠️': '1462474772863652051'
+};
+
+const houseDataPath = path.join(__dirname, 'house_points.json');
+let houseData = { points: {}, daily: {}, reactionAwarded: [] };
+
+if (fs.existsSync(houseDataPath)) {
+    try { houseData = JSON.parse(fs.readFileSync(houseDataPath, 'utf8')); }
+    catch (e) { console.error('寮データの読み込みエラーだちゅ:', e); }
+}
+
+for (const roleId in HOUSE_ROLES) {
+    const hId = HOUSE_ROLES[roleId].id;
+    if (houseData.points[hId] === undefined) houseData.points[hId] = 0;
+}
+
+const saveHouseData = () => {
+    fs.writeFileSync(houseDataPath, JSON.stringify(houseData, null, 2));
+};
+
+const getUserHouse = (member) => {
+    if (!member || !member.roles) return null;
+    for (const roleId in HOUSE_ROLES) {
+        if (member.roles.cache.has(roleId)) return HOUSE_ROLES[roleId];
+    }
+    return null;
+};
 
 // 日本時間を取得する共通関数
 function getJSTInfo() {
@@ -1458,7 +1503,12 @@ client.once('clientReady', async (c) => {
             name: 'temp_remove',
             description: '【管理者用】臨時情報の看板を取り下げる（消す）ちゅ！',
             default_member_permissions: '8'
-        }
+        },
+        // 💡 【追加】寮の得点確認コマンド
+        {
+            name: 'house_points',
+            description: '各寮の現在の得点（ハウスポイント）を確認するちゅ！🏰',
+        },
     ]; // ⬅️ ここがコマンドリストの終わり
 
     const guildIds = ['1450709451488100396','1483795902610145463', '1480458980655366188']; 
@@ -4154,6 +4204,25 @@ client.on('interactionCreate', async (interaction) => {
 
         await interaction.editReply('🚨 臨時看板をセットしたちゅ！次のメッセージから、日替わり看板の上に目立つように表示されるちゅよ！');
     }
+    // 💡 /house_points コマンド (寮の得点確認)
+    else if (interaction.commandName === 'house_points') {
+        let desc = "";
+        const sortedHouses = Object.values(HOUSE_ROLES).map(h => ({
+            name: h.name, emoji: h.emoji, points: houseData.points[h.id]
+        })).sort((a, b) => b.points - a.points);
+
+        sortedHouses.forEach((h, index) => {
+            const rank = index === 0 ? '🏆' : `${index + 1}位`;
+            desc += `${rank} **${h.name}** ${h.emoji} : **${h.points}** 点\n\n`;
+        });
+
+        const embed = new EmbedBuilder()
+            .setTitle('🏰 現在のハウスポイント 🏰')
+            .setDescription(desc)
+            .setColor(0xFFD700);
+        
+        await interaction.reply({ embeds: [embed] });
+    }
     
 });
 // ==========================================================
@@ -4464,6 +4533,55 @@ client.on('messageCreate', async (message) => {
     }
 });
 // ==========================================================
+    // 🏰 寮ポイント：A. デイリーボーナス ＆ C. !cast 魔法システム
+    // ==========================================================
+    const userHouse = getUserHouse(message.member);
+    
+    if (userHouse) {
+        // 💡 A. デイリー活動ボーナス（1日1回の発言で10点！）
+        const todayStr = getJSTInfo().dateStr; 
+        if (houseData.daily[message.author.id] !== todayStr) {
+            houseData.daily[message.author.id] = todayStr;
+            houseData.points[userHouse.id] += 10;
+            saveHouseData();
+            
+            // 邪魔にならないように、こっそりリアクションで「ボーナス入ったよ！」を教えるちゅ！
+            try { await message.react(userHouse.emoji); } catch(e) {}
+        }
+
+        // 💡 C. 闇の魔術システム (!cast コマンド)
+        if (message.content.trim() === '!cast') {
+            const dice = Math.floor(Math.random() * 100) + 1; // 1〜100のダイスだちゅ！
+            let pointChange = 0;
+            let resultMsg = "";
+
+            if (dice >= 80) {
+                pointChange = 20;
+                resultMsg = `✨ **大成功！** 素晴らしい魔法の才能だちゅ！`;
+            } else if (dice >= 50) {
+                pointChange = 10;
+                resultMsg = `🌟 **成功！** 見事な呪文だちゅ！`;
+            } else if (dice >= 20) {
+                pointChange = -10;
+                resultMsg = `💦 **失敗…** 呪文が暴発して少し迷惑をかけちゃったちゅ…！`;
+            } else {
+                pointChange = -20;
+                resultMsg = `💥 **大失敗！！** とんでもない事故が起きたみたいだちゅ…！`;
+            }
+
+            houseData.points[userHouse.id] += pointChange;
+            saveHouseData();
+
+            const embed = new EmbedBuilder()
+                .setTitle(`🪄 ${message.author.username} の !cast`)
+                .setColor(userHouse.color)
+                .setDescription(`ダイス: **${dice}**\n${resultMsg}\n\n**${userHouse.name}** に **${pointChange > 0 ? '+'+pointChange : pointChange}** 点だちゅ！ ${userHouse.emoji}`);
+            
+            await message.reply({ embeds: [embed] });
+            return; // 魔法を唱えた時は、案内板（Sticky）の処理などはスキップするちゅ
+        }
+    }
+// ==========================================================
 // 🕛 【追加】毎日深夜0時に自動で看板を掛け替える魔法！
 // ==========================================================
 cron.schedule('0 0 * * *', async () => {
@@ -4499,5 +4617,47 @@ cron.schedule('0 0 * * *', async () => {
     }
 }, {
     timezone: "Asia/Tokyo" // 日本時間の深夜0時に合わせるちゅ！
+});
+// ==========================================================
+// 🏰 寮ポイント：B. リアクション連動ボーナス
+// ==========================================================
+client.on('messageReactionAdd', async (reaction, user) => {
+    if (user.bot) return;
+    
+    // 昔のメッセージだった場合は中身を引っ張ってくるちゅ！
+    if (reaction.partial) {
+        try { await reaction.fetch(); } catch (error) { return; }
+    }
+
+    const emojiName = reaction.emoji.name;
+    const houseRoleId = HOUSE_EMOJIS[emojiName];
+
+    // 💡 寮のシンボル絵文字で、かつ5個以上集まった場合
+    if (houseRoleId && reaction.count >= 5) {
+        const msgId = reaction.message.id;
+        
+        // まだこのメッセージでポイントを加算していなければ
+        if (!houseData.reactionAwarded.includes(msgId)) {
+            const houseInfo = HOUSE_ROLES[houseRoleId];
+            
+            houseData.points[houseInfo.id] += 5;
+            houseData.reactionAwarded.push(msgId);
+            
+            // 履歴がいっぱいにならないように古いものを消すちゅ
+            if (houseData.reactionAwarded.length > 100) {
+                houseData.reactionAwarded.shift();
+            }
+            saveHouseData();
+
+            // チャンネルにお祝いのアナウンスをするちゅ！
+            const embed = new EmbedBuilder()
+                .setColor(houseInfo.color)
+                .setDescription(`🎉 このメッセージに **${houseInfo.name}** のシンボル(${houseInfo.emoji})が5個集まったちゅ！\n結束力を讃えて、**${houseInfo.name}に 5点 加算**だちゅ！`);
+            
+            try {
+                await reaction.message.reply({ embeds: [embed] });
+            } catch(e) { console.error('リアクションポイント通知エラー:', e); }
+        }
+    }
 });
 client.login(process.env.DISCORD_TOKEN);
