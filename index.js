@@ -4505,34 +4505,11 @@ const getStickyAttachments = async () => {
 };
 
 // 💡 誰かがメッセージを書き込んだ時の処理
+// 💡 誰かがメッセージを書き込んだ時の処理
 client.on('messageCreate', async (message) => {
     if (message.author.bot) return;
 
-    if (message.channelId === STICKY_CHANNEL_ID) {
-        
-        // ① 前にねずみが置いた画像があれば（再起動前の記憶も含めて）ここで消すちゅ！
-        const lastId = stickyMessageIds.get(message.channelId);
-        if (lastId) {
-            try {
-                const lastMsg = await message.channel.messages.fetch(lastId);
-                if (lastMsg) await lastMsg.delete();
-            } catch (e) {}
-        }
-
-        // ② Satoriで新しい画像を作って、一番下に送信するちゅ！
-        try {
-            const attachments = await getStickyAttachments();
-            const sentMsg = await message.channel.send({ files: attachments });
-
-            // ③ 新しく置いた画像のIDを記憶して、メモ帳に保存するちゅ！
-            stickyMessageIds.set(message.channelId, sentMsg.id);
-            saveStickyData();
-        } catch (e) {
-            console.error('最下段画像の設置エラーだちゅ:', e);
-        }
-    }
-});
-// ==========================================================
+    // ==========================================================
     // 🏰 寮ポイント：A. デイリーボーナス ＆ C. !cast 魔法システム
     // ==========================================================
     const userHouse = getUserHouse(message.member);
@@ -4581,6 +4558,34 @@ client.on('messageCreate', async (message) => {
             return; // 魔法を唱えた時は、案内板（Sticky）の処理などはスキップするちゅ
         }
     }
+
+    // ==========================================================
+    // 📌 案内板（Sticky Message）の処理
+    // ==========================================================
+    if (message.channelId === STICKY_CHANNEL_ID) {
+        
+        // ① 前にねずみが置いた画像があれば（再起動前の記憶も含めて）ここで消すちゅ！
+        const lastId = stickyMessageIds.get(message.channelId);
+        if (lastId) {
+            try {
+                const lastMsg = await message.channel.messages.fetch(lastId);
+                if (lastMsg) await lastMsg.delete();
+            } catch (e) {}
+        }
+
+        // ② Satoriで新しい画像を作って、一番下に送信するちゅ！
+        try {
+            const attachments = await getStickyAttachments();
+            const sentMsg = await message.channel.send({ files: attachments });
+
+            // ③ 新しく置いた画像のIDを記憶して、メモ帳に保存するちゅ！
+            stickyMessageIds.set(message.channelId, sentMsg.id);
+            saveStickyData();
+        } catch (e) {
+            console.error('最下段画像の設置エラーだちゅ:', e);
+        }
+    }
+});
 // ==========================================================
 // 🕛 【追加】毎日深夜0時に自動で看板を掛け替える魔法！
 // ==========================================================
