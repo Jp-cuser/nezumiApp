@@ -4217,6 +4217,9 @@ client.on('interactionCreate', async (interaction) => {
     
     // 💡 /temp_remove コマンド (臨時看板を消す)
     else if (interaction.commandName === 'temp_remove') {
+        // 💡 【追加】まずはDiscordに「コマンド受け取ったちゅ！」と返事をする（自分だけに見える設定）
+        await interaction.deferReply({ ephemeral: true }); 
+        
         const tempPath = path.join(__dirname, 'designs', 'temp_board.json');
         
         if (fs.existsSync(tempPath)) {
