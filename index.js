@@ -4186,6 +4186,7 @@ client.on('interactionCreate', async (interaction) => {
         await interaction.editReply(`📅 **${dateStr}** の看板データを登録したちゅ！📝✨\n\`/design_test date:${dateStr}\` でプレビューを見てみてちゅ！`);
     }
     // 💡 /temp_setup コマンド (臨時看板の入力画面を出す)
+    // 💡 /temp_setup コマンド (臨時看板の入力画面を出す)
     else if (interaction.commandName === 'temp_setup') {
         const templateType = interaction.options.getString('template') || 'alert_red'; // 💡 テンプレートを受け取る！
         const { ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
@@ -4195,6 +4196,16 @@ client.on('interactionCreate', async (interaction) => {
 
         const titleInput = new TextInputBuilder().setCustomId('title').setLabel('タイトル（例: 臨時メンテナンスのお知らせ）').setPlaceholder('例: 🚨 ボット停止のお知らせ').setStyle(TextInputStyle.Short).setRequired(true);
         const descInput = new TextInputBuilder().setCustomId('desc').setLabel('内容（改行もできるちゅ！）').setPlaceholder('例: 本日22時よりメンテナンスを行います。').setStyle(TextInputStyle.Paragraph).setRequired(true);
+
+        // 💡 【追加】もし既に臨時看板のデータがあれば、最初から入力欄にセットしておくちゅ！
+        const tempPath = path.join(__dirname, 'designs', 'temp_board.json');
+        if (fs.existsSync(tempPath)) {
+            try {
+                const tempData = JSON.parse(fs.readFileSync(tempPath, 'utf8'));
+                if (tempData.title) titleInput.setValue(tempData.title);
+                if (tempData.desc) descInput.setValue(tempData.desc);
+            } catch(e) { console.error('臨時看板の読み込みエラー:', e); }
+        }
 
         modal.addComponents(
             new ActionRowBuilder().addComponents(titleInput),
