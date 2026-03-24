@@ -165,6 +165,271 @@ app.get('/api/tarot', async (req, res) => {
     });
 });
 
+// ==========================================
+// 🌟 星座占いAPI用ヘルパー関数（全ユーザー共通の乱数）
+// ==========================================
+function getDailyRandom(seedOffset = 0) {
+    const jst = getJSTInfo(); 
+    const finalSeed = jst.seedDate + seedOffset;
+    const x = Math.sin(finalSeed) * 10000;
+    return x - Math.floor(x);
+}
+
+// ==========================================
+// 🌟 星座占い API
+// ==========================================
+app.get('/api/horoscope', async (req, res) => {
+    try {
+        if (!signs || signs.length === 0) {
+            throw new Error("星座データがありません。");
+        }
+
+        // 1. ランキングの生成
+        const ranking = signs.map((name, index) => {
+            const score = Math.floor(getDailyRandom(index) * 100) + 1;
+            const itemIdx = Math.floor(getDailyRandom(index + 100) * luckyItems.length);
+            return { name, score, luckyItem: luckyItems[itemIdx] };
+        });
+        ranking.sort((a, b) => b.score - a.score); // スコア順に並び替え
+
+        // 2. Geminiへプロンプト送信
+        const rankingInfo = ranking.map((item, i) => `${i+1}位:${item.name}`).join('、');
+        const prompt = `占い師「ねずみ」として、以下の星座ランキング各々に50文字以内で短い一言コメントを、最後に「今日の全体の抱負」を300文字以内で作成して。
+リスト：${rankingInfo}
+形式：
+1位：コメント
+2位：コメント
+...
+抱負：抱負の内容
+語尾は「ちゅ」で統一して。`;
+
+        let fullMessage = "みんなにとって素敵な一日になるちゅ！\n抱負：みんなに良いことがありますようにちゅ！";
+        try {
+            const result = await model.generateContent(prompt);
+            fullMessage = result.response.text().trim();
+        } catch (e) {
+            console.error('⚠️ Gemini API Error (Horoscope):', e.message);
+        }
+
+        // 3. AIの返答をJSON用にパース（分解）する
+        const lines = fullMessage.split('\n');
+        
+        // 抱負の抽出
+        let safeHoufu = "今日も1日、自分のペースで楽しく過ごそうちゅ！";
+        const houfuIndex = lines.findIndex(l => l.includes('抱負'));
+        if (houfuIndex !== -1) {
+            const parts = lines[houfuIndex].split(/[：:]/);
+            let extracted = parts.slice(1).join(':').trim();
+            if (extracted === '' && lines.length > houfuIndex + 1) {
+                extracted = lines.slice(houfuIndex + 1).join(' ').trim();
+            }
+            if (extracted !== '') safeHoufu = extracted.replace(/\*/g, '');
+        }
+
+        // 各星座のコメントの抽出
+        const parsedRanking = ranking.map((item, i) => {
+            const targetLine = lines.find(l => l.includes(`${i+1}位`));
+            let comment = "今日はきっといいことがあるちゅ！応援してるちゅ！";
+            if (targetLine) {
+                const parts = targetLine.split(/[：:]/);
+                if (parts.length > 1) {
+                    comment = parts.slice(1).join(':').replace(/\*/g, '').trim();
+                } else {
+                    comment = targetLine.replace(new RegExp(`.*${i+1}位.*`), '').replace(/\*/g, '').trim();
+                }
+                comment = comment.replace(new RegExp(`${item.name}[:：]?`), '').trim();
+            }
+            return {
+                rank: i + 1,
+                name: item.name,
+                score: item.score,
+                luckyItem: item.luckyItem,
+                comment: comment || "今日はきっといいことがあるちゅ！"
+            };
+        });
+
+        // 4. スマホアプリへJSONを返す
+        res.json({
+            date: getJSTInfo().displayDate,
+            overallMessage: safeHoufu,
+            ranking: parsedRanking
+        });
+
+    } catch (error) {
+        console.error("❌ 星座占いAPIエラー:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ==========================================
+// 🪨 ルーン占い API
+// ==========================================
+app.get('/api/rune', async (req, res) => {
+    try {
+        const userId = req.query.userId || 'guest_user';
+        const username = req.query.username || 'ゲスト';
+
+        if (!runeAlphabet || runeAlphabet.length === 0) {
+            throw new Error("ルーンデータがありません。");
+        }
+
+        // 1. ランダム抽選
+        const personalSeed = getPersonalDailyRandom(userId, 777);
+        const runeIndex = Math.floor(personalSeed * runeAlphabet.length);
+        const selectedRune = runeAlphabet[runeIndex];
+
+        // 逆位置が存在しないルーン文字の処理
+        const noReverseRunes = ['ᛗ', 'ᚷ', 'ᚹ', 'ᚻ', 'ᚾ', 'ᛁ', 'ᛃ', 'ᛇ', 'ᛊ', 'ᛝ', 'ᛞ'];
+        let isReversed = getPersonalDailyRandom(userId, 888) < 0.5;
+        if (noReverseRunes.includes(selectedRune.symbol)) isReversed = false;
+
+        // 2. Geminiへプロンプト送信
+        const orientation = isReversed ? "逆位置" : "正位置";
+        const prompt = `占い師「ねずみ」として、ルーン文字「${selectedRune.name}」の${orientation}が出た${username}さんに、300文字以内で神秘的な助言をして。語尾は「ちゅ」。`;
+
+        let geminiExplanation = "石に刻まれた文字が読めないちゅ…。でも運命は味方してるちゅ！";
+        try {
+            const result = await model.generateContent(prompt);
+            geminiExplanation = result.response.text().trim();
+        } catch (e) {
+            console.error('⚠️ Gemini API Error (Rune):', e.message);
+        }
+
+        // 3. スマホアプリへJSONを返す
+        res.json({
+            date: getJSTInfo().displayDate,
+            rune: {
+                name: selectedRune.name,
+                symbol: selectedRune.symbol,
+                imageName: selectedRune.image,
+                isReversed: isReversed,
+                symbolMeaning: selectedRune.meaning,
+                stoneMeaning: isReversed ? selectedRune.reversed : selectedRune.upright
+            },
+            messages: {
+                aiExplanation: geminiExplanation
+            }
+        });
+
+    } catch (error) {
+        console.error("❌ ルーン占いAPIエラー:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+// ==========================================
+// 🌟 タロット3枚引き用 ヘルパー関数
+// ==========================================
+function calculateScore(card, isReversed) {
+    if (card.tone === 'positive') return isReversed ? 1 : 2;  
+    if (card.tone === 'negative') return isReversed ? -1 : -2; 
+    return 0; 
+}
+
+function generateTarotStory(past, present, future) {
+    const s1 = calculateScore(past.card, past.isReversed);
+    const s2 = calculateScore(present.card, present.isReversed);
+    const s3 = calculateScore(future.card, future.isReversed);
+    const totalScore = s1 + s2 + s3;
+
+    let storyType = "";
+    let message = "";
+
+    if (s1 < s2 && s2 < s3) {
+        if (s1 < 0) {
+            storyType = "夜明け（V字回復） 🌅";
+            message = "過去はボロボロのチーズみたいに大変だったけど、ついに光が見えてきたよ！これからは美味しいごちそうが待ってる予感がするんだ、ちゅ！";
+        } else {
+            storyType = "飛躍（右肩上がり） 🚀";
+            message = "今の勢いは本物だよ！まるで大きなひまわりの種を見つけた時みたいに、どんどん良くなっていくよ。自信を持って進んでね！";
+        }
+    } else if (s1 > s2 && s2 > s3) {
+        storyType = "警告（右肩下がり） ⚠️";
+        message = "ううっ、なんだか嫌な予感がするよ……。今は無理に動かず、巣穴でじっとして体力を蓄えるのが一番。足元をよーく確認してね！";
+    } else {
+        storyType = "つかの間の停滞 ☕";
+        if (totalScore >= 0) {
+            message = "今はちょっと一休み。お気に入りの場所で毛づくろいでもして、エネルギーを貯めよう。またすぐに良い波がやってくるはずだよ、ちゅ！";
+        } else {
+            message = "周りがバタバタしてるけど、慌てちゃダメだよ。一歩ずつ、鼻をヒクヒクさせて慎重に進めば、きっと出口が見つかるからね。";
+        }
+    }
+    return { storyType, totalScore, message };
+}
+
+// ==========================================
+// 🔮 タロット占い API (3枚引き)
+// ==========================================
+app.get('/api/tarot3', async (req, res) => {
+    try {
+        const userId = req.query.userId || 'guest_user';
+        const username = req.query.username || 'ゲスト';
+
+        if (!tarotCards || tarotCards.length === 0) {
+            throw new Error("タロットカードのデータがありません。");
+        }
+
+        const positions = ['過去', '現在', '未来'];
+        const drawnResults = []; 
+        // 同じカードが出ないようにデッキをコピーして使うちゅ！
+        let tempDeck = [...tarotCards];
+
+        // 1. カードを3枚引く
+        for (let i = 0; i < 3; i++) {
+            const personalSeed = getPersonalDailyRandom(userId, (i + 1) * 777);
+            const cardIndex = Math.floor(personalSeed * tempDeck.length);
+            const card = tempDeck.splice(cardIndex, 1)[0]; // 引いたカードはデッキから抜く
+
+            const reverseSeed = getPersonalDailyRandom(userId, (i + 1) * 999);
+            const isReversed = reverseSeed < 0.5;
+
+            drawnResults.push({ name: card.name, isReversed: isReversed, card: card, position: positions[i] });
+        }
+
+        // 2. ストーリー（物語）の判定
+        const storyResult = generateTarotStory(drawnResults[0], drawnResults[1], drawnResults[2]);
+
+        // 3. Geminiへ統合リーディングのプロンプト送信
+        const cardInfo = drawnResults.map((c, i) => 
+            `${positions[i]}: ${c.name}(${c.isReversed ? '逆位置' : '正位置'})`
+        ).join('、');
+
+        const prompt = `占い師「ねずみ」として、${username}さんの3枚引き（${cardInfo}）を統合して、400文字以内で一言でアドバイスして。最後は「ちゅ」で締めて。`;
+
+        let geminiExplanation = "運命の糸が絡まってうまく読めなかったちゅ…。でも、どのカードもあなたを応援してるちゅ！";
+        try {
+            const result = await model.generateContent(prompt);
+            geminiExplanation = result.response.text().trim();
+        } catch (e) {
+            console.error('⚠️ Gemini API Error (Tarot 3):', e.message);
+        }
+
+        // 4. スマホアプリへ返すJSONデータを綺麗に整形
+        const formattedCards = drawnResults.map(r => ({
+            position: r.position,
+            name: r.card.name,
+            imageName: r.card.image,
+            isReversed: r.isReversed,
+            meaning: r.isReversed ? r.card.reversed : r.card.upright
+        }));
+
+        res.json({
+            date: getJSTInfo().displayDate,
+            cards: formattedCards,
+            story: {
+                type: storyResult.storyType,
+                message: storyResult.message
+            },
+            messages: {
+                aiExplanation: geminiExplanation
+            }
+        });
+
+    } catch (error) {
+        console.error("❌ タロット3枚引きAPIエラー:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // サーバー起動
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
