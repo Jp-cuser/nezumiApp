@@ -15,6 +15,35 @@ app.use(express.json());
 // imagesフォルダの中身を公開する設定だちゅ！
 app.use('/images', express.static('images'));
 
+// ==========================================
+// 🧠 AI呼び出し統合関数（Gemini → 失敗したらOllama）
+// ==========================================
+// 💡 ここを、あなたがOllamaでダウンロードしているモデル名に書き換えてちゅ！（例: "llama3", "gemma2" など）
+const OLLAMA_MODEL = process.env.LOCAL_LLM_MODEL; 
+
+async function askAI(prompt) {
+    try {
+        // 1. まずは本命のGeminiに頼むちゅ！
+        const result = await model.generateContent(prompt);
+        return result.response.text().trim();
+    } catch (error) {
+        console.log(`⚠️ Geminiが休憩中みたいだちゅ。Ollama(${OLLAMA_MODEL})に切り替えるちゅ！`);
+        
+        // 2. Geminiがエラー（制限など）なら、ローカルのOllamaに頼むちゅ！
+        try {
+            const response = await axios.post('http://100.124.36.36:11434/api/generate', {
+                model: OLLAMA_MODEL,
+                prompt: prompt,
+                stream: false
+            });
+            return response.data.response.trim();
+        } catch (ollamaError) {
+            console.error("❌ Ollamaも繋がらないちゅ…:", ollamaError.message);
+            return "星の導きが混線しているちゅ…。少し待ってからもう一度引いてみてちゅ！";
+        }
+    }
+}
+
 // --- タロット・ルーン等のデータ ---
 const tarotCards = [
     { name: '0. 愚者', tone: 'positive', upright: '自由、冒険、新しい始まり', reversed: '無計画、わがまま、不注意', image: '00_Fool.jpg' },
@@ -110,6 +139,7 @@ function getSingleCardComment(card, isReversed) {
 
 // 💡 キャッシュやローカルLLMへのフォールバックもそのまま！
 const readingCache = new Map();
+// 【修正後】これだけですごくスッキリするちゅ！
 async function getGeminiReading(cardName, isReversed, username) {
     const jst = getJSTInfo();
     const cacheKey = `tarot-${jst.dateStr}-${username}-${cardName}-${isReversed}`;
@@ -118,15 +148,9 @@ async function getGeminiReading(cardName, isReversed, username) {
     const orientation = isReversed ? "逆位置" : "正位置";
     const prompt = `あなたは「ねずみ」という占い師です。${username}さんが引いたカード：${cardName}の${orientation}。${username}さんに向けて、200文字以内で癒やしのアドバイスを1つだけ言って。語尾は「ちゅ」。`;
 
-    try {
-        const result = await model.generateContent(prompt);
-        const text = result.response.text().trim();
-        readingCache.set(cacheKey, text); 
-        return text;
-    } catch (error) {
-        console.error('⚠️ Gemini API Error:', error.message);
-        return "占いの言葉がうまくまとまらなかったちゅ…。でも、きっと大丈夫だちゅ！";
-    }
+    const text = await askAI(prompt); // 💡 ここでハイブリッド関数を呼ぶ！
+    readingCache.set(cacheKey, text); 
+    return text;
 }
 
 // ==========================================
@@ -205,13 +229,7 @@ app.get('/api/horoscope', async (req, res) => {
 抱負：抱負の内容
 語尾は「ちゅ」で統一して。`;
 
-        let fullMessage = "みんなにとって素敵な一日になるちゅ！\n抱負：みんなに良いことがありますようにちゅ！";
-        try {
-            const result = await model.generateContent(prompt);
-            fullMessage = result.response.text().trim();
-        } catch (e) {
-            console.error('⚠️ Gemini API Error (Horoscope):', e.message);
-        }
+        let fullMessage = await askAI(prompt);
 
         // 3. AIの返答をJSON用にパース（分解）する
         const lines = fullMessage.split('\n');
@@ -289,13 +307,7 @@ app.get('/api/rune', async (req, res) => {
         const orientation = isReversed ? "逆位置" : "正位置";
         const prompt = `占い師「ねずみ」として、ルーン文字「${selectedRune.name}」の${orientation}が出た${username}さんに、300文字以内で神秘的な助言をして。語尾は「ちゅ」。`;
 
-        let geminiExplanation = "石に刻まれた文字が読めないちゅ…。でも運命は味方してるちゅ！";
-        try {
-            const result = await model.generateContent(prompt);
-            geminiExplanation = result.response.text().trim();
-        } catch (e) {
-            console.error('⚠️ Gemini API Error (Rune):', e.message);
-        }
+        let geminiExplanation = await askAI(prompt);
 
         // 3. スマホアプリへJSONを返す
         res.json({
