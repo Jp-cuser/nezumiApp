@@ -202,7 +202,7 @@ function getDailyRandom(seedOffset = 0) {
 }
 
 // ==========================================
-// 🌟 星座占い API
+// 🌟 星座占い API (Ollama対応の強力パース版！)
 // ==========================================
 app.get('/api/horoscope', async (req, res) => {
     try {
@@ -216,9 +216,9 @@ app.get('/api/horoscope', async (req, res) => {
             const itemIdx = Math.floor(getDailyRandom(index + 100) * luckyItems.length);
             return { name, score, luckyItem: luckyItems[itemIdx] };
         });
-        ranking.sort((a, b) => b.score - a.score); // スコア順に並び替え
+        ranking.sort((a, b) => b.score - a.score);
 
-        // 2. Geminiへプロンプト送信
+        // 2. AIへプロンプト送信
         const rankingInfo = ranking.map((item, i) => `${i+1}位:${item.name}`).join('、');
         const prompt = `占い師「ねずみ」として、以下の星座ランキング各々に50文字以内で短い一言コメントを、最後に「今日の全体の抱負」を300文字以内で作成して。
 リスト：${rankingInfo}
@@ -226,45 +226,52 @@ app.get('/api/horoscope', async (req, res) => {
 1位：コメント
 2位：コメント
 ...
+12位：コメント
 抱負：抱負の内容
 語尾は「ちゅ」で統一して。`;
 
         let fullMessage = await askAI(prompt);
 
-        // 3. AIの返答をJSON用にパース（分解）する
-        const lines = fullMessage.split('\n');
-        
-        // 抱負の抽出
+        // 3. AIの返答をパースする（Ollamaの柔軟な出力にも対応する強力な魔法！）
         let safeHoufu = "今日も1日、自分のペースで楽しく過ごそうちゅ！";
-        const houfuIndex = lines.findIndex(l => l.includes('抱負'));
-        if (houfuIndex !== -1) {
-            const parts = lines[houfuIndex].split(/[：:]/);
-            let extracted = parts.slice(1).join(':').trim();
-            if (extracted === '' && lines.length > houfuIndex + 1) {
-                extracted = lines.slice(houfuIndex + 1).join(' ').trim();
-            }
-            if (extracted !== '') safeHoufu = extracted.replace(/\*/g, '');
+        
+        // 「抱負」という文字で文章を前後に分ける
+        const parts = fullMessage.split(/抱負[：:\s]*/);
+        if (parts.length > 1) {
+            safeHoufu = parts[1].replace(/\*/g, '').trim(); // 抱負より後ろの部分を取得
         }
+        const rankingsText = parts[0]; // 抱負より前のランキング部分
 
-        // 各星座のコメントの抽出
         const parsedRanking = ranking.map((item, i) => {
-            const targetLine = lines.find(l => l.includes(`${i+1}位`));
+            const currentRankStr = `${i + 1}位`;
+            const nextRankStr = i === 11 ? null : `${i + 2}位`;
+            
             let comment = "今日はきっといいことがあるちゅ！応援してるちゅ！";
-            if (targetLine) {
-                const parts = targetLine.split(/[：:]/);
-                if (parts.length > 1) {
-                    comment = parts.slice(1).join(':').replace(/\*/g, '').trim();
-                } else {
-                    comment = targetLine.replace(new RegExp(`.*${i+1}位.*`), '').replace(/\*/g, '').trim();
-                }
-                comment = comment.replace(new RegExp(`${item.name}[:：]?`), '').trim();
+            const startIndex = rankingsText.indexOf(currentRankStr);
+            
+            if (startIndex !== -1) {
+                // 次の順位の文字がある場所までを切り抜く（見つからなければ最後まで）
+                let endIndex = nextRankStr ? rankingsText.indexOf(nextRankStr) : rankingsText.length;
+                if (endIndex === -1) endIndex = rankingsText.length;
+                
+                let rawComment = rankingsText.substring(startIndex, endIndex);
+                
+                // 「1位：牡羊座 - 」みたいな余分な文字やマークダウン(**)をお掃除するちゅ！
+                rawComment = rawComment
+                    .replace(new RegExp(`^${currentRankStr}[：:\\s\\*]*`), '')
+                    .replace(new RegExp(`${item.name}[：:\\s\\*\\-]*`), '')
+                    .replace(/\*/g, '')
+                    .trim();
+                
+                if (rawComment) comment = rawComment;
             }
+
             return {
                 rank: i + 1,
                 name: item.name,
                 score: item.score,
                 luckyItem: item.luckyItem,
-                comment: comment || "今日はきっといいことがあるちゅ！"
+                comment: comment
             };
         });
 
