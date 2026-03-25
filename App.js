@@ -5,7 +5,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Picker } from '@react-native-picker/picker';
 
-const API_BASE_URL = 'http://100.90.184.110:3000'; 
+const API_BASE_URL = 'https://nezumi-yamii.jp';
 
 // ==========================================
 // 🪄 共通パーツ1：星空の背景
