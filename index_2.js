@@ -12,6 +12,8 @@ const model = genAI.getGenerativeModel({ model: "models/gemini-2.5-flash" });
 const app = express();
 app.use(cors());
 app.use(express.json());
+// imagesフォルダの中身を公開する設定だちゅ！
+app.use('/images', express.static('images'));
 
 // --- タロット・ルーン等のデータ ---
 const tarotCards = [
@@ -114,7 +116,7 @@ async function getGeminiReading(cardName, isReversed, username) {
     if (readingCache.has(cacheKey)) return readingCache.get(cacheKey);
 
     const orientation = isReversed ? "逆位置" : "正位置";
-    const prompt = `あなたは「ねずみ」という占い師です。引かれたカード：${cardName}の${orientation}。200文字以内で、癒やしのアドバイスを1つだけ言って。語尾は「ちゅ」。`;
+    const prompt = `あなたは「ねずみ」という占い師です。${username}さんが引いたカード：${cardName}の${orientation}。${username}さんに向けて、200文字以内で癒やしのアドバイスを1つだけ言って。語尾は「ちゅ」。`;
 
     try {
         const result = await model.generateContent(prompt);
