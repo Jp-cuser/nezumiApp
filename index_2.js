@@ -116,13 +116,8 @@ function getJSTInfo() {
 }
 
 function getPersonalDailyRandom(userId, seedOffset = 0) {
-    // ※アプリ版ではDiscordのIDがないため、スマホ側から送られてくる一意のID(UUID等)や文字列を数値化して使います
-    const jst = getJSTInfo();
-    let numericId = 0;
-    for (let i = 0; i < userId.length; i++) { numericId += userId.charCodeAt(i); }
-    const finalSeed = jst.seedDate + numericId + seedOffset;
-    const x = Math.sin(finalSeed) * 10000;
-    return x - Math.floor(x);
+    // 💡 日付やIDの計算を全部やめて、純粋なランダムにするちゅ！
+    return Math.random();
 }
 
 function getSingleCardComment(card, isReversed) {
